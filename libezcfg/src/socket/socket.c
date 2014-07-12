@@ -1,4 +1,6 @@
-/* ============================================================================
+/* -*- mode: C; c-file-style: "gnu"; indent-tabs-mode: nil; -*- */
+/**
+ * ============================================================================
  * Project Name : ezbox configuration utilities
  * File Name    : socket/socket.c
  *
@@ -41,17 +43,17 @@
 #include "ezcfg-uevent.h"
 
 #if 0
-#define DBG(format, args...) do { \
-	char path[256]; \
-	FILE *dbg_fp; \
-	snprintf(path, 256, "/tmp/%d-debug.txt", getpid()); \
-	dbg_fp = fopen(path, "a"); \
-	if (dbg_fp) { \
-		fprintf(dbg_fp, "tid=[%d] ", (int)gettid()); \
-		fprintf(dbg_fp, format, ## args); \
-		fclose(dbg_fp); \
-	} \
-} while(0)
+#define DBG(format, args...) do {			\
+    char path[256];					\
+    FILE *dbg_fp;					\
+    snprintf(path, 256, "/tmp/%d-debug.txt", getpid()); \
+    dbg_fp = fopen(path, "a");				\
+    if (dbg_fp) {					\
+      fprintf(dbg_fp, "tid=[%d] ", (int)gettid());	\
+      fprintf(dbg_fp, format, ## args);			\
+      fclose(dbg_fp);					\
+    }							\
+  } while(0)
 #else
 #define DBG(format, args...)
 #endif
@@ -61,28 +63,28 @@
  * in the union u.
  */
 struct usa {
-	socklen_t len;
-	union {
-		struct sockaddr sa;
-		struct sockaddr_un sun;
-		struct sockaddr_in sin;
-		struct sockaddr_nl snl;
-	#if (HAVE_EZBOX_EZCFG_IPV6 == 1)
-		struct sockaddr_in6 sin6;
-	#endif
-        } u;
+  socklen_t len;
+  union {
+    struct sockaddr sa;
+    struct sockaddr_un sun;
+    struct sockaddr_in sin;
+    struct sockaddr_nl snl;
+#if (HAVE_EZBOX_EZCFG_IPV6 == 1)
+    struct sockaddr_in6 sin6;
+#endif
+  } u;
 };
 
 /*
  * unified multicast request.
  */
 struct umreq {
-	union {
-		struct ip_mreq       group;     /* IPv4 multicast group */
-	#if (HAVE_EZBOX_EZCFG_IPV6 == 1)
-		struct ipv6_mreq     groupv6;   /* IPv6 multicast group */
-	#endif
-        } u;
+  union {
+    struct ip_mreq       group;     /* IPv4 multicast group */
+#if (HAVE_EZBOX_EZCFG_IPV6 == 1)
+    struct ipv6_mreq     groupv6;   /* IPv6 multicast group */
+#endif
+  } u;
 };
 
 /*
@@ -91,20 +93,20 @@ struct umreq {
  * by the worker thread.
  */
 struct ezcfg_socket {
-	struct ezcfg *ezcfg;
-	struct ezcfg_socket *next;      /* Linkage                      */
-	int                  sock;      /* Listening socket             */
-	int                  proto;     /* Communication protocol 	*/
-	int                  backlog;   /* Listening queue length 	*/
-	int                  domain;
-	int                  type;
-	struct usa           lsa;       /* Local socket address         */
-	struct usa           rsa;       /* Remote socket address        */
-	struct umreq         mreq;      /* Multicast group              */
-	bool                 need_unlink;    /* Need to unlink socket node 	*/
-	bool                 need_delete;    /* Need to delete socket node 	*/
-	char *               buffer;
-	int                  buffer_len;
+  struct ezcfg *ezcfg;
+  struct ezcfg_socket *next;      /* Linkage                      */
+  int                  sock;      /* Listening socket             */
+  int                  proto;     /* Communication protocol 	*/
+  int                  backlog;   /* Listening queue length 	*/
+  int                  domain;
+  int                  type;
+  struct usa           lsa;       /* Local socket address         */
+  struct usa           rsa;       /* Remote socket address        */
+  struct umreq         mreq;      /* Multicast group              */
+  bool                 need_unlink;    /* Need to unlink socket node 	*/
+  bool                 need_delete;    /* Need to delete socket node 	*/
+  char *               buffer;
+  int                  buffer_len;
 };
 
 
@@ -114,31 +116,31 @@ struct ezcfg_socket {
 
 static int set_non_blocking_mode(int sock)
 {
-	int flags;
+  int flags;
 
-	flags = fcntl(sock, F_GETFL, 0);
-	fcntl(sock, F_SETFL, flags | O_NONBLOCK);
+  flags = fcntl(sock, F_GETFL, 0);
+  fcntl(sock, F_SETFL, flags | O_NONBLOCK);
 
-	return 0;
+  return 0;
 }
 
 static void close_socket_gracefully(int sock) {
-	char buf[1024];
-	int n;
+  char buf[1024];
+  int n;
 
-	/* Send FIN to the client */
-	shutdown(sock, 1);
-	set_non_blocking_mode(sock);
+  /* Send FIN to the client */
+  shutdown(sock, 1);
+  set_non_blocking_mode(sock);
 
-	/* Read and discard pending data. If we do not do that and close the
-	 * socket, the data in the send buffer may be discarded.
-	 */
-	do {
-		n = read(sock, buf, sizeof(buf));
-	} while (n > 0);
+  /* Read and discard pending data. If we do not do that and close the
+   * socket, the data in the send buffer may be discarded.
+   */
+  do {
+    n = read(sock, buf, sizeof(buf));
+  } while (n > 0);
 
-	/* Now we know that our FIN is ACK-ed, safe to close */
-	close(sock);
+  /* Now we know that our FIN is ACK-ed, safe to close */
+  close(sock);
 }
 
 /**
@@ -148,400 +150,400 @@ static void close_socket_gracefully(int sock) {
  **/
 static struct ezcfg_socket *create_socket(struct ezcfg *ezcfg, const int domain, const int type, const int proto, const char *socket_path, bool socket_flag)
 {
-	struct ezcfg_socket *sp = NULL;
-	struct usa *usa = NULL;
-	char *addr = NULL;
-	char *port = NULL;
-	int sock_protocol = -1;
-	int buf_size = 16 * 1024 * 1024;
+  struct ezcfg_socket *sp = NULL;
+  struct usa *usa = NULL;
+  char *addr = NULL;
+  char *port = NULL;
+  int sock_protocol = -1;
+  int buf_size = 16 * 1024 * 1024;
 
-	ASSERT(ezcfg != NULL);
-	ASSERT(socket_path != NULL);
+  ASSERT(ezcfg != NULL);
+  ASSERT(socket_path != NULL);
 
-	if (ezcfg_util_socket_is_supported_domain(domain) == false) {
-		err(ezcfg, "unknown socket family %d\n", domain);
-		return NULL;
+  if (ezcfg_util_socket_is_supported_domain(domain) == false) {
+    err(ezcfg, "unknown socket family %d\n", domain);
+    return NULL;
+  }
+
+  if (ezcfg_util_socket_is_supported_protocol(proto) == false) {
+    err(ezcfg, "unknown communication protocol %d\n", proto);
+    return NULL;
+  }
+
+  /* initialize socket */
+  if ((sp = calloc(1, sizeof(struct ezcfg_socket))) == NULL) {
+    err(ezcfg, "calloc socket fail: %m\n");
+    return NULL;
+  }
+  memset(sp, 0, sizeof(struct ezcfg_socket));
+  sp->sock = -1;
+  sp->ezcfg = ezcfg;
+  sp->proto = proto;
+  sp->domain = domain;
+  sp->type = type;
+
+  /* FIXME: should change sock_protocol w/r proto */
+  if (proto == EZCFG_PROTO_UEVENT) {
+    sock_protocol = NETLINK_KOBJECT_UEVENT;
+  }
+  else {
+    sock_protocol = 0;
+  }
+
+  switch (domain) {
+  case AF_LOCAL:
+    /* create socket ? */
+    if (socket_flag == true) {
+      sp->sock = socket(AF_LOCAL, type, sock_protocol);
+      if (sp->sock < 0) {
+	err(ezcfg, "socket error\n");
+	goto fail_exit;
+      }
+    }
+    usa = &(sp->lsa);
+    usa->u.sun.sun_family = AF_LOCAL;
+    strcpy(usa->u.sun.sun_path, socket_path);
+    usa->len = offsetof(struct sockaddr_un, sun_path) + strlen(usa->u.sun.sun_path);
+    /* translate leading '@' to abstract namespace */
+    if (usa->u.sun.sun_path[0] == '@') {
+      usa->u.sun.sun_path[0] = '\0';
+    }
+    break;
+
+  case AF_INET:
+    addr = strdup(socket_path);
+    if (addr == NULL) {
+      err(ezcfg, "can not alloc addr.\n");
+      goto fail_exit;
+    }
+    port = strchr(addr, ':');
+    if (port == NULL) {
+      err(ezcfg, "socket_path format error.\n");
+      goto fail_exit;
+    }
+    *port = '\0';
+    port++;
+
+    /* create socket ? */
+    if (socket_flag == true) {
+      sp->sock = socket(AF_INET, type, sock_protocol);
+      if (sp->sock < 0) {
+	err(ezcfg, "socket error\n");
+	goto fail_exit;
+      }
+    }
+    usa = &(sp->lsa);
+    usa->u.sin.sin_family = AF_INET;
+    if (ezcfg_util_socket_is_multicast_address(proto, addr) == true) {
+      int reuse = 1;
+      char *if_addr, *if_port;
+      if_addr = strchr(port, '@');
+      if (if_addr == NULL) {
+	err(ezcfg, "muticast socket_path format error.\n");
+	goto fail_exit;
+      }
+      *if_addr = '\0';
+      if_addr++;
+      if_port = strchr(if_addr, ':');
+      if (if_port != NULL) {
+	*if_port = '\0';
+	if_port++;
+      }
+      else {
+	/* set to multicast port */
+	if_port = port;
+      }
+      usa->u.sin.sin_addr.s_addr = inet_addr(if_addr);
+      usa->u.sin.sin_port = htons((uint16_t)atoi(if_port));
+      usa->len = sizeof(usa->u.sin);
+
+      /* set remote pear info */
+      usa = &(sp->rsa);
+      usa->u.sin.sin_family = AF_INET;
+      usa->u.sin.sin_addr.s_addr = inet_addr(addr);
+      usa->u.sin.sin_port = htons((uint16_t)atoi(port));
+      usa->len = sizeof(usa->u.sin);
+
+      /*
+       * enable SO_REUSEADDR to allow multiple instances of this
+       * application to receive copies of the multicast datagrams.
+       */
+      if (socket_flag == true) {
+	if(setsockopt(sp->sock, SOL_SOCKET, SO_REUSEADDR, (char *)&reuse, sizeof(reuse)) < 0) {
+	  err(ezcfg, "setting SO_REUSEADDR error\n");
+	  goto fail_exit;
 	}
+      }
 
-	if (ezcfg_util_socket_is_supported_protocol(proto) == false) {
-		err(ezcfg, "unknown communication protocol %d\n", proto);
-		return NULL;
+      /*
+       * join the multicast group [addr](239.255.255.250) on the [if_addr] interface.
+       * note that this IP_ADD_MEMBERSHIP option must be
+       * called for each local interface over which the multicast
+       * datagrams are to be received. */
+      sp->mreq.u.group.imr_multiaddr.s_addr = inet_addr(addr);
+      sp->mreq.u.group.imr_interface.s_addr = inet_addr(if_addr);
+    }
+    else
+      {
+	usa->u.sin.sin_addr.s_addr = inet_addr(addr);
+	if (usa->u.sin.sin_addr.s_addr == 0) {
+	  err(ezcfg, "convert IP address error\n");
+	  goto fail_exit;
 	}
+	usa->u.sin.sin_port = htons((uint16_t)atoi(port));
+	usa->len = sizeof(usa->u.sin);
+      }
+    /* FIXME: must after dealing the address string, multicast socket path is a special case */
+    free(addr);
+    addr = NULL;
 
-	/* initialize socket */
-	if ((sp = calloc(1, sizeof(struct ezcfg_socket))) == NULL) {
-		err(ezcfg, "calloc socket fail: %m\n");
-		return NULL;
-	}
-	memset(sp, 0, sizeof(struct ezcfg_socket));
-	sp->sock = -1;
-	sp->ezcfg = ezcfg;
-	sp->proto = proto;
-	sp->domain = domain;
-	sp->type = type;
-
-	/* FIXME: should change sock_protocol w/r proto */
-	if (proto == EZCFG_PROTO_UEVENT) {
-		sock_protocol = NETLINK_KOBJECT_UEVENT;
-	}
-	else {
-		sock_protocol = 0;
-	}
-
-	switch (domain) {
-	case AF_LOCAL:
-		/* create socket ? */
-		if (socket_flag == true) {
-			sp->sock = socket(AF_LOCAL, type, sock_protocol);
-			if (sp->sock < 0) {
-				err(ezcfg, "socket error\n");
-				goto fail_exit;
-			}
-		}
-		usa = &(sp->lsa);
-		usa->u.sun.sun_family = AF_LOCAL;
-		strcpy(usa->u.sun.sun_path, socket_path);
-		usa->len = offsetof(struct sockaddr_un, sun_path) + strlen(usa->u.sun.sun_path);
-		/* translate leading '@' to abstract namespace */
-		if (usa->u.sun.sun_path[0] == '@') {
-			usa->u.sun.sun_path[0] = '\0';
-		}
-		break;
-
-	case AF_INET:
-		addr = strdup(socket_path);
-		if (addr == NULL) {
-			err(ezcfg, "can not alloc addr.\n");
-			goto fail_exit;
-		}
-		port = strchr(addr, ':');
-		if (port == NULL) {
-			err(ezcfg, "socket_path format error.\n");
-			goto fail_exit;
-		}
-		*port = '\0';
-		port++;
-
-		/* create socket ? */
-		if (socket_flag == true) {
-			sp->sock = socket(AF_INET, type, sock_protocol);
-			if (sp->sock < 0) {
-				err(ezcfg, "socket error\n");
-				goto fail_exit;
-			}
-		}
-		usa = &(sp->lsa);
-		usa->u.sin.sin_family = AF_INET;
-		if (ezcfg_util_socket_is_multicast_address(proto, addr) == true) {
-			int reuse = 1;
-			char *if_addr, *if_port;
-			if_addr = strchr(port, '@');
-			if (if_addr == NULL) {
-				err(ezcfg, "muticast socket_path format error.\n");
-				goto fail_exit;
-			}
-			*if_addr = '\0';
-			if_addr++;
-			if_port = strchr(if_addr, ':');
-			if (if_port != NULL) {
-				*if_port = '\0';
-				if_port++;
-			}
-			else {
-				/* set to multicast port */
-				if_port = port;
-			}
-			usa->u.sin.sin_addr.s_addr = inet_addr(if_addr);
-			usa->u.sin.sin_port = htons((uint16_t)atoi(if_port));
-			usa->len = sizeof(usa->u.sin);
-
-			/* set remote pear info */
-			usa = &(sp->rsa);
-			usa->u.sin.sin_family = AF_INET;
-			usa->u.sin.sin_addr.s_addr = inet_addr(addr);
-			usa->u.sin.sin_port = htons((uint16_t)atoi(port));
-			usa->len = sizeof(usa->u.sin);
-
-			/*
-			 * enable SO_REUSEADDR to allow multiple instances of this
-			 * application to receive copies of the multicast datagrams.
-			 */
-			if (socket_flag == true) {
-				if(setsockopt(sp->sock, SOL_SOCKET, SO_REUSEADDR, (char *)&reuse, sizeof(reuse)) < 0) {
-					err(ezcfg, "setting SO_REUSEADDR error\n");
-					goto fail_exit;
-				}
-			}
-
-			/*
-			 * join the multicast group [addr](239.255.255.250) on the [if_addr] interface.
-			 * note that this IP_ADD_MEMBERSHIP option must be
-			 * called for each local interface over which the multicast
-			 * datagrams are to be received. */
-			sp->mreq.u.group.imr_multiaddr.s_addr = inet_addr(addr);
-			sp->mreq.u.group.imr_interface.s_addr = inet_addr(if_addr);
-		}
-		else
-		{
-			usa->u.sin.sin_addr.s_addr = inet_addr(addr);
-			if (usa->u.sin.sin_addr.s_addr == 0) {
-				err(ezcfg, "convert IP address error\n");
-				goto fail_exit;
-			}
-			usa->u.sin.sin_port = htons((uint16_t)atoi(port));
-			usa->len = sizeof(usa->u.sin);
-		}
-		/* FIXME: must after dealing the address string, multicast socket path is a special case */
-		free(addr);
-		addr = NULL;
-
-		break;
+    break;
 
 #if (HAVE_EZBOX_EZCFG_IPV6 == 1)
-	case AF_INET6:
-		/* [fe80::1%eth0]:80 */
-		if (*socket_path != '[') {
-			err(ezcfg, "socket_path format error, missing [.\n");
-			goto fail_exit;
-		}
-		/* skip '[' */
-		addr = strdup(socket_path+1);
-		if (addr == NULL) {
-			err(ezcfg, "can not alloc addr.\n");
-			goto fail_exit;
-		}
-		port = strchr(addr, ']');
-		if (port == NULL) {
-			err(ezcfg, "socket_path format error, missing ].\n");
-			goto fail_exit;
-		}
-		*port = '\0';
-		port++;
-		if (*port != ':') {
-			err(ezcfg, "socket_path format error, missing port.\n");
-			goto fail_exit;
-		}
-		*port = '\0';
-		port++;
+  case AF_INET6:
+    /* [fe80::1%eth0]:80 */
+    if (*socket_path != '[') {
+      err(ezcfg, "socket_path format error, missing [.\n");
+      goto fail_exit;
+    }
+    /* skip '[' */
+    addr = strdup(socket_path+1);
+    if (addr == NULL) {
+      err(ezcfg, "can not alloc addr.\n");
+      goto fail_exit;
+    }
+    port = strchr(addr, ']');
+    if (port == NULL) {
+      err(ezcfg, "socket_path format error, missing ].\n");
+      goto fail_exit;
+    }
+    *port = '\0';
+    port++;
+    if (*port != ':') {
+      err(ezcfg, "socket_path format error, missing port.\n");
+      goto fail_exit;
+    }
+    *port = '\0';
+    port++;
 
-		/* create socket ? */
-		if (socket_flag == true) {
-			sp->sock = socket(AF_INET6, type, sock_protocol);
-			if (sp->sock < 0) {
-				err(ezcfg, "socket error\n");
-				goto fail_exit;
-			}
-		}
-		usa = &(sp->lsa);
-		usa->u.sin6.sin6_family = AF_INET6;
-		if (ezcfg_util_socket_is_multicast_address(proto, addr) == true) {
-			int reuse = 1;
-			char *if_addr, *if_port;
-			struct addrinfo hints;
-			struct addrinfo *result;
-			int s;
-			if_addr = strchr(port, '@');
-			if (if_addr == NULL) {
-				err(ezcfg, "muticast socket_path format error, missing @.\n");
-				goto fail_exit;
-			}
-			*if_addr = '\0';
-			if_addr++;
-			if (*if_addr != '[') {
-				err(ezcfg, "muticast socket_path format error, missing [.\n");
-				goto fail_exit;
-			}
-			if_port = strchr(if_addr, ']');
-			if (if_port == NULL) {
-				err(ezcfg, "muticast socket_path format error, missing ].\n");
-				goto fail_exit;
-			}
-			*if_port = '\0';
-			if_port++;
-			if (*if_port == ':') {
-				*if_port = '\0';
-				if_port++;
-			}
-			else {
-				/* set to multicast port */
-				if_port = port;
-			}
+    /* create socket ? */
+    if (socket_flag == true) {
+      sp->sock = socket(AF_INET6, type, sock_protocol);
+      if (sp->sock < 0) {
+	err(ezcfg, "socket error\n");
+	goto fail_exit;
+      }
+    }
+    usa = &(sp->lsa);
+    usa->u.sin6.sin6_family = AF_INET6;
+    if (ezcfg_util_socket_is_multicast_address(proto, addr) == true) {
+      int reuse = 1;
+      char *if_addr, *if_port;
+      struct addrinfo hints;
+      struct addrinfo *result;
+      int s;
+      if_addr = strchr(port, '@');
+      if (if_addr == NULL) {
+	err(ezcfg, "muticast socket_path format error, missing @.\n");
+	goto fail_exit;
+      }
+      *if_addr = '\0';
+      if_addr++;
+      if (*if_addr != '[') {
+	err(ezcfg, "muticast socket_path format error, missing [.\n");
+	goto fail_exit;
+      }
+      if_port = strchr(if_addr, ']');
+      if (if_port == NULL) {
+	err(ezcfg, "muticast socket_path format error, missing ].\n");
+	goto fail_exit;
+      }
+      *if_port = '\0';
+      if_port++;
+      if (*if_port == ':') {
+	*if_port = '\0';
+	if_port++;
+      }
+      else {
+	/* set to multicast port */
+	if_port = port;
+      }
 
-			/* Obtain address(es) matching host/port */
-			memset(&hints, 0, sizeof(struct addrinfo));
-			hints.ai_family = AF_INET6;
-			hints.ai_socktype = type;
-			hints.ai_flags = 0;
-			hints.ai_protocol = 0;          /* Any protocol */
+      /* Obtain address(es) matching host/port */
+      memset(&hints, 0, sizeof(struct addrinfo));
+      hints.ai_family = AF_INET6;
+      hints.ai_socktype = type;
+      hints.ai_flags = 0;
+      hints.ai_protocol = 0;          /* Any protocol */
 
-			s = getaddrinfo(if_addr, if_port, &hints, &result);
-			if (s != 0) {
-				err(ezcfg, "getaddrinfo: %s\n", gai_strerror(s));
-				goto fail_exit;
-			}
-			if (result->ai_next != NULL) {
-				err(ezcfg, "getaddrinfo: ambiguity socket address\n");
-				freeaddrinfo(result);
-				goto fail_exit;
-			}
+      s = getaddrinfo(if_addr, if_port, &hints, &result);
+      if (s != 0) {
+	err(ezcfg, "getaddrinfo: %s\n", gai_strerror(s));
+	goto fail_exit;
+      }
+      if (result->ai_next != NULL) {
+	err(ezcfg, "getaddrinfo: ambiguity socket address\n");
+	freeaddrinfo(result);
+	goto fail_exit;
+      }
 
-			memcpy(&(usa->u.sa), result->ai_addr, result->ai_addrlen);
-			freeaddrinfo(result);
+      memcpy(&(usa->u.sa), result->ai_addr, result->ai_addrlen);
+      freeaddrinfo(result);
 
-			usa->len = sizeof(usa->u.sin6);
+      usa->len = sizeof(usa->u.sin6);
 
-			/* set remote pear info */
-			usa = &(sp->rsa);
-			usa->u.sin6.sin6_family = AF_INET6;
+      /* set remote pear info */
+      usa = &(sp->rsa);
+      usa->u.sin6.sin6_family = AF_INET6;
 
-			/* Obtain address(es) matching host/port */
-			memset(&hints, 0, sizeof(struct addrinfo));
-			hints.ai_family = AF_INET6;
-			hints.ai_socktype = type;
-			hints.ai_flags = 0;
-			hints.ai_protocol = 0;          /* Any protocol */
+      /* Obtain address(es) matching host/port */
+      memset(&hints, 0, sizeof(struct addrinfo));
+      hints.ai_family = AF_INET6;
+      hints.ai_socktype = type;
+      hints.ai_flags = 0;
+      hints.ai_protocol = 0;          /* Any protocol */
 
-			s = getaddrinfo(addr, port, &hints, &result);
-			if (s != 0) {
-				err(ezcfg, "getaddrinfo: %s\n", gai_strerror(s));
-				goto fail_exit;
-			}
-			if (result->ai_next != NULL) {
-				err(ezcfg, "getaddrinfo: ambiguity socket address\n");
-				freeaddrinfo(result);
-				goto fail_exit;
-			}
+      s = getaddrinfo(addr, port, &hints, &result);
+      if (s != 0) {
+	err(ezcfg, "getaddrinfo: %s\n", gai_strerror(s));
+	goto fail_exit;
+      }
+      if (result->ai_next != NULL) {
+	err(ezcfg, "getaddrinfo: ambiguity socket address\n");
+	freeaddrinfo(result);
+	goto fail_exit;
+      }
 
-			memcpy(&(usa->u.sa), result->ai_addr, result->ai_addrlen);
-			freeaddrinfo(result);
+      memcpy(&(usa->u.sa), result->ai_addr, result->ai_addrlen);
+      freeaddrinfo(result);
 
-			usa->len = sizeof(usa->u.sin6);
+      usa->len = sizeof(usa->u.sin6);
 
-			/*
-			 * enable SO_REUSEADDR to allow multiple instances of this
-			 * application to receive copies of the multicast datagrams.
-			 */
-			if (socket_flag == true) {
-				if(setsockopt(sp->sock, SOL_SOCKET, SO_REUSEADDR, (char *)&reuse, sizeof(reuse)) < 0) {
-					err(ezcfg, "setting SO_REUSEADDR error\n");
-					goto fail_exit;
-				}
-			}
+      /*
+       * enable SO_REUSEADDR to allow multiple instances of this
+       * application to receive copies of the multicast datagrams.
+       */
+      if (socket_flag == true) {
+	if(setsockopt(sp->sock, SOL_SOCKET, SO_REUSEADDR, (char *)&reuse, sizeof(reuse)) < 0) {
+	  err(ezcfg, "setting SO_REUSEADDR error\n");
+	  goto fail_exit;
+	}
+      }
 
-			/*
-			 * join the multicast group [addr](ff02::c) on the [if_addr] interface.
-			 * note that this IPV6_ADD_MEMBERSHIP option must be
-			 * called for each local interface over which the multicast
-			 * datagrams are to be received. */
-			usa = &(sp->rsa);
-			memcpy(&(sp->mreq.u.groupv6.ipv6mr_multiaddr), &(usa->u.sin6), usa->len);
-			usa = &(sp->lsa);
-			sp->mreq.u.groupv6.ipv6mr_interface = usa->u.sin6.sin6_scope_id;
-		}
-		else
-		{
-			struct addrinfo hints;
-			struct addrinfo *result;
-			int s;
+      /*
+       * join the multicast group [addr](ff02::c) on the [if_addr] interface.
+       * note that this IPV6_ADD_MEMBERSHIP option must be
+       * called for each local interface over which the multicast
+       * datagrams are to be received. */
+      usa = &(sp->rsa);
+      memcpy(&(sp->mreq.u.groupv6.ipv6mr_multiaddr), &(usa->u.sin6), usa->len);
+      usa = &(sp->lsa);
+      sp->mreq.u.groupv6.ipv6mr_interface = usa->u.sin6.sin6_scope_id;
+    }
+    else
+      {
+	struct addrinfo hints;
+	struct addrinfo *result;
+	int s;
 
-			/* Obtain address(es) matching host/port */
-			memset(&hints, 0, sizeof(struct addrinfo));
-			hints.ai_family = AF_INET6;
-			hints.ai_socktype = type;
-			hints.ai_flags = 0;
-			hints.ai_protocol = 0;          /* Any protocol */
+	/* Obtain address(es) matching host/port */
+	memset(&hints, 0, sizeof(struct addrinfo));
+	hints.ai_family = AF_INET6;
+	hints.ai_socktype = type;
+	hints.ai_flags = 0;
+	hints.ai_protocol = 0;          /* Any protocol */
 
-			s = getaddrinfo(addr, port, &hints, &result);
-			if (s != 0) {
-				err(ezcfg, "getaddrinfo: %s\n", gai_strerror(s));
-				goto fail_exit;
-			}
-			if (result->ai_next != NULL) {
-				err(ezcfg, "getaddrinfo: ambiguity socket address\n");
-				freeaddrinfo(result);
-				goto fail_exit;
-			}
+	s = getaddrinfo(addr, port, &hints, &result);
+	if (s != 0) {
+	  err(ezcfg, "getaddrinfo: %s\n", gai_strerror(s));
+	  goto fail_exit;
+	}
+	if (result->ai_next != NULL) {
+	  err(ezcfg, "getaddrinfo: ambiguity socket address\n");
+	  freeaddrinfo(result);
+	  goto fail_exit;
+	}
 
-			memcpy(&(usa->u.sa), result->ai_addr, result->ai_addrlen);
-			freeaddrinfo(result);
+	memcpy(&(usa->u.sa), result->ai_addr, result->ai_addrlen);
+	freeaddrinfo(result);
 
-			usa->len = sizeof(usa->u.sin6);
-		}
-		/* FIXME: must after dealing the address string, multicast socket path is a special case */
-		free(addr);
-		addr = NULL;
+	usa->len = sizeof(usa->u.sin6);
+      }
+    /* FIXME: must after dealing the address string, multicast socket path is a special case */
+    free(addr);
+    addr = NULL;
 
-		break;
+    break;
 #endif
 
-	case AF_NETLINK:
-		/* create socket ? */
-		if (socket_flag == true) {
-			sp->sock = socket(AF_NETLINK, type, sock_protocol);
-			if (sp->sock < 0) {
-				err(ezcfg, "socket error\n");
-				goto fail_exit;
-			}
-			/* set receive buffer size */
-			if (setsockopt(sp->sock, SOL_SOCKET, SO_RCVBUFFORCE, &buf_size, sizeof(buf_size))) {
-				buf_size = 106496;
-				if (setsockopt(sp->sock, SOL_SOCKET, SO_RCVBUF, &buf_size, sizeof(buf_size))) {
-					err(ezcfg, "socket set receive buffer size error\n");
-					goto fail_exit;
-				}
-			}
-		}
-		usa = &(sp->lsa);
-		usa->u.snl.nl_family = AF_NETLINK;
-		//usa->u.snl.nl_groups = 1;
-		if (strcmp(socket_path, "kernel") == 0) {
-			usa->u.snl.nl_groups = UEVENT_NLGRP_KERNEL;
-		}
-		else {
-			usa->u.snl.nl_groups = UEVENT_NLGRP_NONE;
-		}
-		//usa->u.snl.nl_pid = getpid();
-		if (socket_flag == true) {
-			int err = 0;
-			//const int on = 1;
-			struct sockaddr_nl snl;
-			socklen_t addrlen;
-
-			/*
-			 * get the address the kernel has assigned us
-			 * it is usually, but not necessarily the pid
-			 */
-			addrlen = sizeof(struct sockaddr_nl);
-			err = getsockname(sp->sock, (struct sockaddr *)&snl, &addrlen);
-			if (err == 0)
-				usa->u.snl.nl_pid = snl.nl_pid;
-
-			/* enable receiving of sender credentials */
-			//setsockopt(sp->sock, SOL_SOCKET, SO_PASSCRED, &on, sizeof(on));
-		}
-		usa->len = sizeof(usa->u.snl);
-		break;
-
-	default:
-		err(ezcfg, "bad family [%d]\n", domain);
-		goto fail_exit;
-		break;
+  case AF_NETLINK:
+    /* create socket ? */
+    if (socket_flag == true) {
+      sp->sock = socket(AF_NETLINK, type, sock_protocol);
+      if (sp->sock < 0) {
+	err(ezcfg, "socket error\n");
+	goto fail_exit;
+      }
+      /* set receive buffer size */
+      if (setsockopt(sp->sock, SOL_SOCKET, SO_RCVBUFFORCE, &buf_size, sizeof(buf_size))) {
+	buf_size = 106496;
+	if (setsockopt(sp->sock, SOL_SOCKET, SO_RCVBUF, &buf_size, sizeof(buf_size))) {
+	  err(ezcfg, "socket set receive buffer size error\n");
+	  goto fail_exit;
 	}
+      }
+    }
+    usa = &(sp->lsa);
+    usa->u.snl.nl_family = AF_NETLINK;
+    //usa->u.snl.nl_groups = 1;
+    if (strcmp(socket_path, "kernel") == 0) {
+      usa->u.snl.nl_groups = UEVENT_NLGRP_KERNEL;
+    }
+    else {
+      usa->u.snl.nl_groups = UEVENT_NLGRP_NONE;
+    }
+    //usa->u.snl.nl_pid = getpid();
+    if (socket_flag == true) {
+      int err = 0;
+      //const int on = 1;
+      struct sockaddr_nl snl;
+      socklen_t addrlen;
 
-	return sp;
+      /*
+       * get the address the kernel has assigned us
+       * it is usually, but not necessarily the pid
+       */
+      addrlen = sizeof(struct sockaddr_nl);
+      err = getsockname(sp->sock, (struct sockaddr *)&snl, &addrlen);
+      if (err == 0)
+	usa->u.snl.nl_pid = snl.nl_pid;
 
-fail_exit:
-	if (addr != NULL) {
-		free(addr);
-	}
+      /* enable receiving of sender credentials */
+      //setsockopt(sp->sock, SOL_SOCKET, SO_PASSCRED, &on, sizeof(on));
+    }
+    usa->len = sizeof(usa->u.snl);
+    break;
 
-	if (sp != NULL) {
-		if (sp->sock >= 0) {
-			close(sp->sock);
-		}
-		free(sp);
-	}
-	return NULL;
+  default:
+    err(ezcfg, "bad family [%d]\n", domain);
+    goto fail_exit;
+    break;
+  }
+
+  return sp;
+
+ fail_exit:
+  if (addr != NULL) {
+    free(addr);
+  }
+
+  if (sp != NULL) {
+    if (sp->sock >= 0) {
+      close(sp->sock);
+    }
+    free(sp);
+  }
+  return NULL;
 }
 
 /**
@@ -555,25 +557,25 @@ fail_exit:
  **/
 void ezcfg_socket_delete(struct ezcfg_socket *sp)
 {
-	struct ezcfg *ezcfg;
-	ASSERT(sp != NULL);
+  struct ezcfg *ezcfg;
+  ASSERT(sp != NULL);
 
-	ezcfg = sp->ezcfg;
+  ezcfg = sp->ezcfg;
 
-	if (sp->sock >= 0) {
-		close(sp->sock);
-		/* also remove the filesystem node */
-		if (sp->domain == AF_LOCAL && sp->need_unlink == true) {
+  if (sp->sock >= 0) {
+    close(sp->sock);
+    /* also remove the filesystem node */
+    if (sp->domain == AF_LOCAL && sp->need_unlink == true) {
 			
-			if (unlink(sp->lsa.u.sun.sun_path) == -1) {
-				err(ezcfg, "unlink fail: %m\n");
-			}
-		}
-	}
-	if (sp->buffer != NULL) {
-		free(sp->buffer);
-	}
-	free(sp);
+      if (unlink(sp->lsa.u.sun.sun_path) == -1) {
+	err(ezcfg, "unlink fail: %m\n");
+      }
+    }
+  }
+  if (sp->buffer != NULL) {
+    free(sp->buffer);
+  }
+  free(sp);
 }
 
 /**
@@ -583,7 +585,7 @@ void ezcfg_socket_delete(struct ezcfg_socket *sp)
  **/
 struct ezcfg_socket *ezcfg_socket_new(struct ezcfg *ezcfg, const int domain, const int type, const int proto, const char *socket_path)
 {
-	return create_socket(ezcfg, domain, type, proto, socket_path, true);
+  return create_socket(ezcfg, domain, type, proto, socket_path, true);
 }
 
 /**
@@ -593,182 +595,182 @@ struct ezcfg_socket *ezcfg_socket_new(struct ezcfg *ezcfg, const int domain, con
  **/
 struct ezcfg_socket *ezcfg_socket_fake_new(struct ezcfg *ezcfg, const int domain, const int type, const int proto, const char *socket_path)
 {
-	return create_socket(ezcfg, domain, type, proto, socket_path, false);
+  return create_socket(ezcfg, domain, type, proto, socket_path, false);
 }
 
 struct ezcfg *ezcfg_socket_get_ezcfg(const struct ezcfg_socket *sp)
 {
-	ASSERT(sp != NULL);
-	return sp->ezcfg;
+  ASSERT(sp != NULL);
+  return sp->ezcfg;
 }
 
 bool ezcfg_socket_set_sock(struct ezcfg_socket *sp, const int sock)
 {
-	ASSERT(sp != NULL);
-	sp->sock = sock;
-	return true;
+  ASSERT(sp != NULL);
+  sp->sock = sock;
+  return true;
 }
 
 int ezcfg_socket_get_sock(const struct ezcfg_socket *sp)
 {
-	ASSERT(sp != NULL);
-	return sp->sock;
+  ASSERT(sp != NULL);
+  return sp->sock;
 }
 
 bool ezcfg_socket_set_proto(struct ezcfg_socket *sp, const int proto)
 {
-	ASSERT(sp != NULL);
-	sp->proto = proto;
-	return true;
+  ASSERT(sp != NULL);
+  sp->proto = proto;
+  return true;
 }
 
 int ezcfg_socket_get_proto(const struct ezcfg_socket *sp)
 {
-	ASSERT(sp != NULL);
-	return sp->proto;
+  ASSERT(sp != NULL);
+  return sp->proto;
 }
 
 bool ezcfg_socket_set_domain(struct ezcfg_socket *sp, const int domain)
 {
-	ASSERT(sp != NULL);
-	sp->domain = domain;
-	return true;
+  ASSERT(sp != NULL);
+  sp->domain = domain;
+  return true;
 }
 
 int ezcfg_socket_get_domain(const struct ezcfg_socket *sp)
 {
-	ASSERT(sp != NULL);
-	return sp->domain;
+  ASSERT(sp != NULL);
+  return sp->domain;
 }
 
 bool ezcfg_socket_set_type(struct ezcfg_socket *sp, const int type)
 {
-	ASSERT(sp != NULL);
-	sp->type = type;
-	return true;
+  ASSERT(sp != NULL);
+  sp->type = type;
+  return true;
 }
 
 int ezcfg_socket_get_type(const struct ezcfg_socket *sp)
 {
-	ASSERT(sp != NULL);
-	return sp->type;
+  ASSERT(sp != NULL);
+  return sp->type;
 }
 
 bool ezcfg_socket_set_buffer(struct ezcfg_socket *sp, char *buf, int buf_len)
 {
-	char *p;
+  char *p;
 
-	ASSERT(sp != NULL);
-	ASSERT(buf != NULL);
-	ASSERT(buf_len >= 0);
+  ASSERT(sp != NULL);
+  ASSERT(buf != NULL);
+  ASSERT(buf_len >= 0);
 
-	p = malloc(buf_len);
-	if (p == NULL) {
-		return false;
-	}
+  p = malloc(buf_len);
+  if (p == NULL) {
+    return false;
+  }
 
-	memcpy(p, buf, buf_len);
+  memcpy(p, buf, buf_len);
 
-	if (sp->buffer != NULL) {
-		free(sp->buffer);
-	}
-	sp->buffer = p;
-	sp->buffer_len = buf_len;
+  if (sp->buffer != NULL) {
+    free(sp->buffer);
+  }
+  sp->buffer = p;
+  sp->buffer_len = buf_len;
 
-	return true;
+  return true;
 }
 
 char *ezcfg_socket_get_buffer(const struct ezcfg_socket *sp)
 {
-	ASSERT(sp != NULL);
-	return sp->buffer;
+  ASSERT(sp != NULL);
+  return sp->buffer;
 }
 
 int ezcfg_socket_get_buffer_len(const struct ezcfg_socket *sp)
 {
-	ASSERT(sp != NULL);
-	return sp->buffer_len;
+  ASSERT(sp != NULL);
+  return sp->buffer_len;
 }
 
 struct ezcfg_socket *ezcfg_socket_get_next(const struct ezcfg_socket *sp)
 {
-	ASSERT(sp != NULL);
-	return sp->next;
+  ASSERT(sp != NULL);
+  return sp->next;
 }
 
 int ezcfg_socket_get_local_socket_len(struct ezcfg_socket *sp)
 {
-	ASSERT(sp != NULL);
-	return sp->lsa.len;
+  ASSERT(sp != NULL);
+  return sp->lsa.len;
 }
 
 char *ezcfg_socket_get_local_socket_path(struct ezcfg_socket *sp, char *addr, int size)
 {
-	ASSERT(sp != NULL);
-	ASSERT(addr != NULL);
-	ASSERT(size > 0);
-	if (snprintf(addr, size, "%s", sp->lsa.u.sun.sun_path) < size)
-		return addr;
-	else
-		return NULL;
+  ASSERT(sp != NULL);
+  ASSERT(addr != NULL);
+  ASSERT(size > 0);
+  if (snprintf(addr, size, "%s", sp->lsa.u.sun.sun_path) < size)
+    return addr;
+  else
+    return NULL;
 }
 
 char *ezcfg_socket_get_local_socket_ip(struct ezcfg_socket *sp)
 {
-	ASSERT(sp != NULL);
-	return inet_ntoa(sp->lsa.u.sin.sin_addr);
+  ASSERT(sp != NULL);
+  return inet_ntoa(sp->lsa.u.sin.sin_addr);
 }
 
 char *ezcfg_socket_get_group_interface_ip(struct ezcfg_socket *sp)
 {
-	ASSERT(sp != NULL);
-	return inet_ntoa(sp->mreq.u.group.imr_interface);
+  ASSERT(sp != NULL);
+  return inet_ntoa(sp->mreq.u.group.imr_interface);
 }
 
 int ezcfg_socket_get_remote_socket_len(struct ezcfg_socket *sp)
 {
-	ASSERT(sp != NULL);
-	return sp->rsa.len;
+  ASSERT(sp != NULL);
+  return sp->rsa.len;
 }
 
 char *ezcfg_socket_get_remote_socket_path(struct ezcfg_socket *sp, char *addr, int size)
 {
-	ASSERT(sp != NULL);
-	ASSERT(addr != NULL);
-	ASSERT(size > 0);
-	if (snprintf(addr, size, "%s", sp->rsa.u.sun.sun_path) < size)
-		return addr;
-	else
-		return NULL;
+  ASSERT(sp != NULL);
+  ASSERT(addr != NULL);
+  ASSERT(size > 0);
+  if (snprintf(addr, size, "%s", sp->rsa.u.sun.sun_path) < size)
+    return addr;
+  else
+    return NULL;
 }
 
 char *ezcfg_socket_get_mcast_socket_path(struct ezcfg_socket *sp, char *addr, int size)
 {
-	ASSERT(sp != NULL);
-	ASSERT(addr != NULL);
-	ASSERT(size > 0);
+  ASSERT(sp != NULL);
+  ASSERT(addr != NULL);
+  ASSERT(size > 0);
 
-	if (sp->domain == AF_INET) {
-		if (inet_ntop(sp->domain, &(sp->mreq.u.group.imr_multiaddr),
-			addr, sizeof(struct sockaddr_in)) == NULL)
-			return NULL;
-		else
-			return addr;
-        }
+  if (sp->domain == AF_INET) {
+    if (inet_ntop(sp->domain, &(sp->mreq.u.group.imr_multiaddr),
+		  addr, sizeof(struct sockaddr_in)) == NULL)
+      return NULL;
+    else
+      return addr;
+  }
 #if (HAVE_EZBOX_EZCFG_IPV6 == 1)
-	else if (sp->domain == AF_INET6) {
-		*addr='[';
-		if (inet_ntop(sp->domain, &(sp->mreq.u.groupv6.ipv6mr_multiaddr),
-			addr+1, sizeof(struct sockaddr_in6)) == NULL) {
-			return NULL;
-		}
-		strcat(addr, "]");
-		return addr;
-        }
+  else if (sp->domain == AF_INET6) {
+    *addr='[';
+    if (inet_ntop(sp->domain, &(sp->mreq.u.groupv6.ipv6mr_multiaddr),
+		  addr+1, sizeof(struct sockaddr_in6)) == NULL) {
+      return NULL;
+    }
+    strcat(addr, "]");
+    return addr;
+  }
 #endif
-        else {
-                return NULL;
-	}
+  else {
+    return NULL;
+  }
 }
 
 /**
@@ -778,20 +780,23 @@ char *ezcfg_socket_get_mcast_socket_path(struct ezcfg_socket *sp, char *addr, in
  **/
 struct ezcfg_socket *ezcfg_socket_calloc(struct ezcfg *ezcfg, int size)
 {
-	struct ezcfg_socket *sp;
+  struct ezcfg_socket *sp;
+  int i;
 
-	ASSERT(ezcfg != NULL);
-	ASSERT(size > 0);
+  ASSERT(ezcfg != NULL);
+  ASSERT(size > 0);
 
-	sp = calloc(size, sizeof(struct ezcfg_socket));
-	if (sp == NULL) {
-		err(ezcfg, "calloc fail: %m\n");
-	}
-	memset(sp, 0, sizeof(struct ezcfg_socket));
-	sp->sock = -1;
-	sp->ezcfg = ezcfg;
+  sp = calloc(size, sizeof(struct ezcfg_socket));
+  if (sp == NULL) {
+    err(ezcfg, "calloc fail: %m\n");
+    return NULL;
+  }
+  for (i = 0; i < size; i++) {
+    sp[i].sock = -1;
+    sp[i].ezcfg = ezcfg;
+  }
 
-	return sp;
+  return sp;
 }
 
 /**
@@ -802,33 +807,33 @@ struct ezcfg_socket *ezcfg_socket_calloc(struct ezcfg *ezcfg, int size)
  **/
 bool ezcfg_socket_list_delete_socket(struct ezcfg_socket **list, struct ezcfg_socket *sp)
 {
-	struct ezcfg_socket *prev, *cur;
+  struct ezcfg_socket *prev, *cur;
 
-	ASSERT(list != NULL);
+  ASSERT(list != NULL);
 
-	if (sp == NULL) {
-		return true;
-	}
+  if (sp == NULL) {
+    return true;
+  }
 
-	cur = *list;
-	if (sp == cur) {
-		*list = cur->next;
-		ezcfg_socket_delete(cur);
-		return true;
-	}
+  cur = *list;
+  if (sp == cur) {
+    *list = cur->next;
+    ezcfg_socket_delete(cur);
+    return true;
+  }
 
-	prev = cur;
-	cur = cur->next;
-	while (cur != NULL) {
-		if (sp == cur) {
-			prev->next = cur->next;
-			ezcfg_socket_delete(cur);
-			return true;
-		}
-		prev = cur;
-		cur = cur->next;
-	}
-	return false;
+  prev = cur;
+  cur = cur->next;
+  while (cur != NULL) {
+    if (sp == cur) {
+      prev->next = cur->next;
+      ezcfg_socket_delete(cur);
+      return true;
+    }
+    prev = cur;
+    cur = cur->next;
+  }
+  return false;
 }
 
 /**
@@ -838,16 +843,16 @@ bool ezcfg_socket_list_delete_socket(struct ezcfg_socket **list, struct ezcfg_so
  **/
 void ezcfg_socket_list_delete(struct ezcfg_socket **list)
 {
-	struct ezcfg_socket *cur;
+  struct ezcfg_socket *cur;
 
-	ASSERT(list != NULL);
+  ASSERT(list != NULL);
 
-	cur = *list;
-	while (cur != NULL) {
-		*list = cur->next;
-		ezcfg_socket_delete(cur);
-		cur = *list;
-	}
+  cur = *list;
+  while (cur != NULL) {
+    *list = cur->next;
+    ezcfg_socket_delete(cur);
+    cur = *list;
+  }
 }
 
 /**
@@ -857,63 +862,63 @@ void ezcfg_socket_list_delete(struct ezcfg_socket **list)
  **/
 int ezcfg_socket_list_insert(struct ezcfg_socket **list, struct ezcfg_socket *sp)
 {
-	ASSERT(list != NULL);
-	ASSERT(sp != NULL);
+  ASSERT(list != NULL);
+  ASSERT(sp != NULL);
 
-	sp->next = *list;
-	*list = sp;
-	return 0;
+  sp->next = *list;
+  *list = sp;
+  return 0;
 }
 
 bool ezcfg_socket_list_in(struct ezcfg_socket **list, struct ezcfg_socket *sp)
 {
-	struct ezcfg *ezcfg;
-	struct ezcfg_socket *cur;
+  struct ezcfg *ezcfg;
+  struct ezcfg_socket *cur;
 
-	ASSERT(list != NULL);
-	ASSERT(sp != NULL);
+  ASSERT(list != NULL);
+  ASSERT(sp != NULL);
 
-	ezcfg = sp->ezcfg;
+  ezcfg = sp->ezcfg;
 
-	cur = *list;
-	while (cur != NULL) {
-		if (ezcfg_socket_compare(sp, cur) == true) {
-			info(ezcfg, "find match socket\n");
-			return true;
-		}
-		cur = cur->next;
-	}
-	return false;
+  cur = *list;
+  while (cur != NULL) {
+    if (ezcfg_socket_compare(sp, cur) == true) {
+      info(ezcfg, "find match socket\n");
+      return true;
+    }
+    cur = cur->next;
+  }
+  return false;
 }
 
 struct ezcfg_socket * ezcfg_socket_list_next(struct ezcfg_socket **list)
 {
-	ASSERT(list != NULL);
+  ASSERT(list != NULL);
 
-	return (*list)->next;
+  return (*list)->next;
 }
 
 bool ezcfg_socket_list_set_need_delete(struct ezcfg_socket **list, struct ezcfg_socket *sp, bool need_delete)
 {
-	struct ezcfg *ezcfg;
-	struct ezcfg_socket *cur;
-	bool ret = false;
+  struct ezcfg *ezcfg;
+  struct ezcfg_socket *cur;
+  bool ret = false;
 
-	ASSERT(list != NULL);
-	ASSERT(sp != NULL);
+  ASSERT(list != NULL);
+  ASSERT(sp != NULL);
 
-	ezcfg = sp->ezcfg;
+  ezcfg = sp->ezcfg;
 
-	cur = *list;
-	while (cur != NULL) {
-		if (ezcfg_socket_compare(sp, cur) == true) {
-			info(ezcfg, "find match socket\n");
-			cur->need_delete = need_delete;
-			ret = true;
-		}
-		cur = cur->next;
-	}
-	return ret;
+  cur = *list;
+  while (cur != NULL) {
+    if (ezcfg_socket_compare(sp, cur) == true) {
+      info(ezcfg, "find match socket\n");
+      cur->need_delete = need_delete;
+      ret = true;
+    }
+    cur = cur->next;
+  }
+  return ret;
 }
 
 /**
@@ -924,48 +929,48 @@ bool ezcfg_socket_list_set_need_delete(struct ezcfg_socket **list, struct ezcfg_
  */
 int ezcfg_socket_binding(struct ezcfg_socket *sp)
 {
-	int err = 0;
-	struct usa *usa = NULL;
-	struct ezcfg *ezcfg;
+  int err = 0;
+  struct usa *usa = NULL;
+  struct ezcfg *ezcfg;
 
-	ASSERT(sp != NULL);
+  ASSERT(sp != NULL);
 
-	ezcfg = sp->ezcfg;
-	usa = &(sp->lsa);
+  ezcfg = sp->ezcfg;
+  usa = &(sp->lsa);
 
-	switch(sp->domain) {
-	case AF_LOCAL:
-		err = bind(sp->sock,
-		           (struct sockaddr *)&usa->u.sun, usa->len);
-		break;
+  switch(sp->domain) {
+  case AF_LOCAL:
+    err = bind(sp->sock,
+	       (struct sockaddr *)&usa->u.sun, usa->len);
+    break;
 
-	case AF_INET:
-		err = bind(sp->sock,
-		           (struct sockaddr *)&usa->u.sin, usa->len);
-		break;
+  case AF_INET:
+    err = bind(sp->sock,
+	       (struct sockaddr *)&usa->u.sin, usa->len);
+    break;
 
 #if (HAVE_EZBOX_EZCFG_IPV6 == 1)
-	case AF_INET6:
-		err = bind(sp->sock,
-		           (struct sockaddr *)&usa->u.sin6, usa->len);
-		break;
+  case AF_INET6:
+    err = bind(sp->sock,
+	       (struct sockaddr *)&usa->u.sin6, usa->len);
+    break;
 #endif
 
-	case AF_NETLINK:
-		err = bind(sp->sock,
-		           (struct sockaddr *)&usa->u.snl, usa->len);
-		break;
+  case AF_NETLINK:
+    err = bind(sp->sock,
+	       (struct sockaddr *)&usa->u.snl, usa->len);
+    break;
 
-	default:
-		err(ezcfg, "unknown family [%d]\n", sp->domain);
-		return -EINVAL;
-	}
+  default:
+    err(ezcfg, "unknown family [%d]\n", sp->domain);
+    return -EINVAL;
+  }
 
-	if (err < 0) {
-		return err;
-	}
+  if (err < 0) {
+    return err;
+  }
 
-	return 0;
+  return 0;
 }
 
 /**
@@ -976,57 +981,57 @@ int ezcfg_socket_binding(struct ezcfg_socket *sp)
  */
 int ezcfg_socket_enable_receiving(struct ezcfg_socket *sp)
 {
-	int err = 0;
-	struct usa *usa = NULL;
-	struct ezcfg *ezcfg;
+  int err = 0;
+  struct usa *usa = NULL;
+  struct ezcfg *ezcfg;
 
-	ASSERT(sp != NULL);
+  ASSERT(sp != NULL);
 
-	ezcfg = sp->ezcfg;
-	usa = &(sp->lsa);
+  ezcfg = sp->ezcfg;
+  usa = &(sp->lsa);
 
-	switch(sp->domain) {
-	case AF_LOCAL:
-		err = bind(sp->sock,
-		           (struct sockaddr *)&usa->u.sun, usa->len);
-		break;
+  switch(sp->domain) {
+  case AF_LOCAL:
+    err = bind(sp->sock,
+	       (struct sockaddr *)&usa->u.sun, usa->len);
+    break;
 
-	case AF_INET:
-		if (sp->proto == EZCFG_PROTO_UPNP_SSDP) {
-			usa->u.sin.sin_addr.s_addr = INADDR_ANY;
-		}
+  case AF_INET:
+    if (sp->proto == EZCFG_PROTO_UPNP_SSDP) {
+      usa->u.sin.sin_addr.s_addr = INADDR_ANY;
+    }
 
-		err = bind(sp->sock,
-		           (struct sockaddr *)&usa->u.sin, usa->len);
-		if (err < 0) {
-			break;
-		}
+    err = bind(sp->sock,
+	       (struct sockaddr *)&usa->u.sin, usa->len);
+    if (err < 0) {
+      break;
+    }
 
-		if (sp->proto == EZCFG_PROTO_UPNP_SSDP) {
-			err = setsockopt(sp->sock,
-				IPPROTO_IP, IP_ADD_MEMBERSHIP,
-				(char *)&(sp->mreq.u.group), sizeof(sp->mreq.u.group));
-		}
+    if (sp->proto == EZCFG_PROTO_UPNP_SSDP) {
+      err = setsockopt(sp->sock,
+		       IPPROTO_IP, IP_ADD_MEMBERSHIP,
+		       (char *)&(sp->mreq.u.group), sizeof(sp->mreq.u.group));
+    }
 
-		break;
+    break;
 
-	case AF_NETLINK:
-		err = bind(sp->sock,
-		           (struct sockaddr *)&usa->u.snl, usa->len);
-		break;
+  case AF_NETLINK:
+    err = bind(sp->sock,
+	       (struct sockaddr *)&usa->u.snl, usa->len);
+    break;
 
-	default:
-		err(ezcfg, "unknown family [%d]\n", sp->domain);
-		return -EINVAL;
-	}
+  default:
+    err(ezcfg, "unknown family [%d]\n", sp->domain);
+    return -EINVAL;
+  }
 
-	if (err < 0) {
-		return err;
-	}
+  if (err < 0) {
+    return err;
+  }
 
-	/* enable receiving of sender credentials */
-	//setsockopt(sp->sock, SOL_SOCKET, SO_PASSCRED, &on, sizeof(on));
-	return 0;
+  /* enable receiving of sender credentials */
+  //setsockopt(sp->sock, SOL_SOCKET, SO_PASSCRED, &on, sizeof(on));
+  return 0;
 }
 
 /**
@@ -1037,48 +1042,48 @@ int ezcfg_socket_enable_receiving(struct ezcfg_socket *sp)
  */
 int ezcfg_socket_enable_listening(struct ezcfg_socket *sp, int backlog)
 {
-	int err = 0;
-	struct ezcfg *ezcfg;
+  int err = 0;
+  struct ezcfg *ezcfg;
 
-	ASSERT(sp != NULL);
-	ASSERT(backlog > 0);
+  ASSERT(sp != NULL);
+  ASSERT(backlog > 0);
 
-	ezcfg = sp->ezcfg;
-	sp->backlog = backlog;
+  ezcfg = sp->ezcfg;
+  sp->backlog = backlog;
 
-	switch(sp->domain) {
-	case AF_LOCAL:
-	case AF_INET:
+  switch(sp->domain) {
+  case AF_LOCAL:
+  case AF_INET:
 #if (HAVE_EZBOX_EZCFG_IPV6 == 1)
-	case AF_INET6:
+  case AF_INET6:
 #endif
-		if (sp->type == SOCK_STREAM) {
-			err = listen(sp->sock, backlog);
-		}
-		else if (sp->type == SOCK_DGRAM) {
-			info(ezcfg, "SOCK_DGRAM not need listen\n");
-		}
-		break;
+    if (sp->type == SOCK_STREAM) {
+      err = listen(sp->sock, backlog);
+    }
+    else if (sp->type == SOCK_DGRAM) {
+      info(ezcfg, "SOCK_DGRAM not need listen\n");
+    }
+    break;
 
-	case AF_NETLINK:
-		if (sp->proto == EZCFG_PROTO_UEVENT) {
-			info(ezcfg, "UEVENT not need listen\n");
-		}
-		break;
+  case AF_NETLINK:
+    if (sp->proto == EZCFG_PROTO_UEVENT) {
+      info(ezcfg, "UEVENT not need listen\n");
+    }
+    break;
 
-	default:
-		err(ezcfg, "unknown family [%d]\n", sp->domain);
-		return -EINVAL;
-	}
+  default:
+    err(ezcfg, "unknown family [%d]\n", sp->domain);
+    return -EINVAL;
+  }
 
-	if (err < 0) {
-		err(ezcfg, "enable listening error.\n");
-		return err;
-	}
+  if (err < 0) {
+    err(ezcfg, "enable listening error.\n");
+    return err;
+  }
 
-	/* enable receiving of sender credentials */
-	//setsockopt(sp->sock, SOL_SOCKET, SO_PASSCRED, &on, sizeof(on));
-	return 0;
+  /* enable receiving of sender credentials */
+  //setsockopt(sp->sock, SOL_SOCKET, SO_PASSCRED, &on, sizeof(on));
+  return 0;
 }
 
 /**
@@ -1089,44 +1094,44 @@ int ezcfg_socket_enable_listening(struct ezcfg_socket *sp, int backlog)
  */
 int ezcfg_socket_enable_again(struct ezcfg_socket *sp)
 {
-	int err = 0;
-	//struct ezcfg *ezcfg;
-	int sock_protocol = -1;
+  int err = 0;
+  //struct ezcfg *ezcfg;
+  int sock_protocol = -1;
 
-	ASSERT(sp != NULL);
+  ASSERT(sp != NULL);
 
-	//ezcfg = sp->ezcfg;
+  //ezcfg = sp->ezcfg;
 
-	ezcfg_socket_close_sock(sp);
+  ezcfg_socket_close_sock(sp);
 
-	/* FIXME: should change sock_protocol w/r sp->proto */
-	if (sp->proto == EZCFG_PROTO_UEVENT) {
-		sock_protocol = NETLINK_KOBJECT_UEVENT;
-	}
-	else {
-		sock_protocol = 0;
-	}
+  /* FIXME: should change sock_protocol w/r sp->proto */
+  if (sp->proto == EZCFG_PROTO_UEVENT) {
+    sock_protocol = NETLINK_KOBJECT_UEVENT;
+  }
+  else {
+    sock_protocol = 0;
+  }
 
-	sp->sock = socket(sp->domain, sp->type, sock_protocol);
-	if (sp->sock < 0) {
-		return -1;
-	}
+  sp->sock = socket(sp->domain, sp->type, sock_protocol);
+  if (sp->sock < 0) {
+    return -1;
+  }
 
-	err = ezcfg_socket_enable_receiving(sp);
-	if (err < 0) {
-		return err;
-	}
+  err = ezcfg_socket_enable_receiving(sp);
+  if (err < 0) {
+    return err;
+  }
 
-	if (sp->backlog > 0) {
-		err = ezcfg_socket_enable_listening(sp, sp->backlog);
-		if (err < 0) {
-			return err;
-		}
-	}
+  if (sp->backlog > 0) {
+    err = ezcfg_socket_enable_listening(sp, sp->backlog);
+    if (err < 0) {
+      return err;
+    }
+  }
 
-        ezcfg_socket_set_close_on_exec(sp);
+  ezcfg_socket_set_close_on_exec(sp);
 
-	return 0;
+  return 0;
 }
 
 /**
@@ -1136,102 +1141,102 @@ int ezcfg_socket_enable_again(struct ezcfg_socket *sp)
  */
 int ezcfg_socket_enable_sending(struct ezcfg_socket *sp)
 {
-	int err = 0;
-	struct usa *usa = NULL;
-	struct ezcfg *ezcfg;
+  int err = 0;
+  struct usa *usa = NULL;
+  struct ezcfg *ezcfg;
 
-	ASSERT(sp != NULL);
+  ASSERT(sp != NULL);
 
-	ezcfg = sp->ezcfg;
-	usa = &(sp->rsa);
+  ezcfg = sp->ezcfg;
+  usa = &(sp->rsa);
 
-	switch(sp->domain) {
-	case AF_LOCAL:
-		break;
+  switch(sp->domain) {
+  case AF_LOCAL:
+    break;
 
-	case AF_INET:
-		if (sp->proto == EZCFG_PROTO_UPNP_SSDP) {
-			char loopch = 0;
+  case AF_INET:
+    if (sp->proto == EZCFG_PROTO_UPNP_SSDP) {
+      char loopch = 0;
 
-			/* Disable loopback so you do not receive your own datagrams. */
-			err = setsockopt(sp->sock, IPPROTO_IP, IP_MULTICAST_LOOP, (char *)&loopch, sizeof(loopch));
-			if (err < 0) {
-				break;
-			}
+      /* Disable loopback so you do not receive your own datagrams. */
+      err = setsockopt(sp->sock, IPPROTO_IP, IP_MULTICAST_LOOP, (char *)&loopch, sizeof(loopch));
+      if (err < 0) {
+	break;
+      }
 
-			/* Set local interface for outbound multicast datagrams. */
-			/* The IP address specified must be associated with a local, */
-			/* multicast capable interface. */
-			err = setsockopt(sp->sock,
-				IPPROTO_IP, IP_MULTICAST_IF,
-				(char *)&(sp->mreq.u.group.imr_interface), sizeof(sp->mreq.u.group.imr_interface));
-			if (err < 0) {
-				break;
-			}
+      /* Set local interface for outbound multicast datagrams. */
+      /* The IP address specified must be associated with a local, */
+      /* multicast capable interface. */
+      err = setsockopt(sp->sock,
+		       IPPROTO_IP, IP_MULTICAST_IF,
+		       (char *)&(sp->mreq.u.group.imr_interface), sizeof(sp->mreq.u.group.imr_interface));
+      if (err < 0) {
+	break;
+      }
 
-			err = connect(sp->sock, (struct sockaddr *)&(usa->u.sin), usa->len);
-		}
-		break;
+      err = connect(sp->sock, (struct sockaddr *)&(usa->u.sin), usa->len);
+    }
+    break;
 
 #if (HAVE_EZBOX_EZCFG_IPV6 == 1)
-	case AF_INET6:
-		if (sp->proto == EZCFG_PROTO_UPNP_SSDP) {
-			char loopch = 0;
+  case AF_INET6:
+    if (sp->proto == EZCFG_PROTO_UPNP_SSDP) {
+      char loopch = 0;
 
-			/* Disable loopback so you do not receive your own datagrams. */
-			err = setsockopt(sp->sock, IPPROTO_IPV6, IPV6_MULTICAST_LOOP, (char *)&loopch, sizeof(loopch));
-			if (err < 0) {
-				break;
-			}
+      /* Disable loopback so you do not receive your own datagrams. */
+      err = setsockopt(sp->sock, IPPROTO_IPV6, IPV6_MULTICAST_LOOP, (char *)&loopch, sizeof(loopch));
+      if (err < 0) {
+	break;
+      }
 
-			/* Set local interface for outbound multicast datagrams. */
-			/* The IP address specified must be associated with a local, */
-			/* multicast capable interface. */
-			err = setsockopt(sp->sock,
-				IPPROTO_IPV6, IPV6_MULTICAST_IF,
-				(char *)&(sp->mreq.u.group.imr_interface), sizeof(sp->mreq.u.group.imr_interface));
-			if (err < 0) {
-				break;
-			}
+      /* Set local interface for outbound multicast datagrams. */
+      /* The IP address specified must be associated with a local, */
+      /* multicast capable interface. */
+      err = setsockopt(sp->sock,
+		       IPPROTO_IPV6, IPV6_MULTICAST_IF,
+		       (char *)&(sp->mreq.u.group.imr_interface), sizeof(sp->mreq.u.group.imr_interface));
+      if (err < 0) {
+	break;
+      }
 
-			err = connect(sp->sock, (struct sockaddr *)&(usa->u.sin6), usa->len);
-		}
-		break;
+      err = connect(sp->sock, (struct sockaddr *)&(usa->u.sin6), usa->len);
+    }
+    break;
 #endif
 
-	case AF_NETLINK:
-		break;
+  case AF_NETLINK:
+    break;
 
-	default:
-		err(ezcfg, "unknown family [%d]\n", sp->domain);
-		return -EINVAL;
-	}
+  default:
+    err(ezcfg, "unknown family [%d]\n", sp->domain);
+    return -EINVAL;
+  }
 
-	if (err < 0) {
-		return err;
-	}
+  if (err < 0) {
+    return err;
+  }
 
-	return 0;
+  return 0;
 }
 
 bool ezcfg_socket_compare(struct ezcfg_socket *sp1, struct ezcfg_socket *sp2)
 {
-	struct usa *usa1 = NULL, *usa2 = NULL;
+  struct usa *usa1 = NULL, *usa2 = NULL;
 
-	ASSERT(sp1 != NULL);
-	ASSERT(sp2 != NULL);
+  ASSERT(sp1 != NULL);
+  ASSERT(sp2 != NULL);
 
-	usa1 = &(sp1->lsa);
-	usa2 = &(sp2->lsa);
-	if ((sp1->proto == sp2->proto) &&
-	    (sp1->domain == sp2->domain) &&
-	    (sp1->type == sp2->type) &&
-	    (usa1->len == usa2->len)) {
-		if (memcmp(&(usa1->u.sa), &(usa2->u.sa), usa1->len) == 0) {
-			return true;
-		}
-	}
-	return false;
+  usa1 = &(sp1->lsa);
+  usa2 = &(sp2->lsa);
+  if ((sp1->proto == sp2->proto) &&
+      (sp1->domain == sp2->domain) &&
+      (sp1->type == sp2->type) &&
+      (usa1->len == usa2->len)) {
+    if (memcmp(&(usa1->u.sa), &(usa2->u.sa), usa1->len) == 0) {
+      return true;
+    }
+  }
+  return false;
 }
 
 /**
@@ -1244,433 +1249,433 @@ bool ezcfg_socket_compare(struct ezcfg_socket *sp1, struct ezcfg_socket *sp2)
  */
 int ezcfg_socket_set_receive_buffer_size(struct ezcfg_socket *sp, int size)
 {
-	if (sp == NULL)
-		return -1;
-	if (setsockopt(sp->sock, SOL_SOCKET, SO_RCVBUFFORCE, &size, sizeof(size)) < 0)
-		return -1;
-	return 0;
+  if (sp == NULL)
+    return -1;
+  if (setsockopt(sp->sock, SOL_SOCKET, SO_RCVBUFFORCE, &size, sizeof(size)) < 0)
+    return -1;
+  return 0;
 }
 
 int ezcfg_socket_queue_get_socket(const struct ezcfg_socket *queue, int pos, struct ezcfg_socket *sp)
 {
-	*sp = queue[pos];
-	return 0;
+  *sp = queue[pos];
+  return 0;
 }
 
 int ezcfg_socket_queue_set_socket(struct ezcfg_socket *queue, int pos, const struct ezcfg_socket *sp)
 {
-	queue[pos] = *sp;
-	return 0;
+  queue[pos] = *sp;
+  return 0;
 }
 
 static struct ezcfg_socket *new_accepted_socket_stream(const struct ezcfg_socket *listener)
 {
-	struct ezcfg_socket *accepted;
-	struct ezcfg *ezcfg;
-	int domain;
+  struct ezcfg_socket *accepted;
+  struct ezcfg *ezcfg;
+  int domain;
 
-	ezcfg = listener->ezcfg;
+  ezcfg = listener->ezcfg;
 
-	accepted = calloc(1, sizeof(struct ezcfg_socket));
-	if (accepted == NULL) {
-		err(ezcfg, "calloc fail: %m\n");
-		return NULL;
-	}
-	memset(accepted, 0, sizeof(struct ezcfg_socket));
-	accepted->ezcfg = ezcfg;
-	accepted->sock = -1;
-	accepted->proto = listener->proto;
-	accepted->lsa = listener->lsa;
-	accepted->rsa = listener->rsa;
-	accepted->mreq = listener->mreq;
-	accepted->need_unlink = listener->need_unlink;
-	domain = listener->domain;
-	accepted->domain = domain;
-	accepted->type = listener->type;
-	accepted->buffer = NULL;
+  accepted = calloc(1, sizeof(struct ezcfg_socket));
+  if (accepted == NULL) {
+    err(ezcfg, "calloc fail: %m\n");
+    return NULL;
+  }
+  memset(accepted, 0, sizeof(struct ezcfg_socket));
+  accepted->ezcfg = ezcfg;
+  accepted->sock = -1;
+  accepted->proto = listener->proto;
+  accepted->lsa = listener->lsa;
+  accepted->rsa = listener->rsa;
+  accepted->mreq = listener->mreq;
+  accepted->need_unlink = listener->need_unlink;
+  domain = listener->domain;
+  accepted->domain = domain;
+  accepted->type = listener->type;
+  accepted->buffer = NULL;
 
-	switch(domain) {
-	case AF_LOCAL:
-		accepted->rsa.len = sizeof(accepted->rsa.u.sun);
-		accepted->sock = accept(listener->sock,
-		                        &(accepted->rsa.u.sa),
-		                        &(accepted->rsa.len));
-		if (accepted->sock == -1) {
-			free(accepted);
-			return NULL;
-		}
-		break;
+  switch(domain) {
+  case AF_LOCAL:
+    accepted->rsa.len = sizeof(accepted->rsa.u.sun);
+    accepted->sock = accept(listener->sock,
+			    &(accepted->rsa.u.sa),
+			    &(accepted->rsa.len));
+    if (accepted->sock == -1) {
+      free(accepted);
+      return NULL;
+    }
+    break;
 
-	case AF_INET:
-		accepted->rsa.len = sizeof(accepted->rsa.u.sin);
-		accepted->sock = accept(listener->sock,
-		                        &(accepted->rsa.u.sa),
-		                        &(accepted->rsa.len));
-		if (accepted->sock == -1) {
-			free(accepted);
-			return NULL;
-		}
-		break;
+  case AF_INET:
+    accepted->rsa.len = sizeof(accepted->rsa.u.sin);
+    accepted->sock = accept(listener->sock,
+			    &(accepted->rsa.u.sa),
+			    &(accepted->rsa.len));
+    if (accepted->sock == -1) {
+      free(accepted);
+      return NULL;
+    }
+    break;
 
 #if (HAVE_EZBOX_EZCFG_IPV6 == 1)
-	case AF_INET6:
-		accepted->rsa.len = sizeof(accepted->rsa.u.sin6);
-		accepted->sock = accept(listener->sock,
-		                        &(accepted->rsa.u.sa),
-		                        &(accepted->rsa.len));
-		if (accepted->sock == -1) {
-			free(accepted);
-			return NULL;
-		}
-		break;
+  case AF_INET6:
+    accepted->rsa.len = sizeof(accepted->rsa.u.sin6);
+    accepted->sock = accept(listener->sock,
+			    &(accepted->rsa.u.sa),
+			    &(accepted->rsa.len));
+    if (accepted->sock == -1) {
+      free(accepted);
+      return NULL;
+    }
+    break;
 #endif
 
 #if 0
-	case AF_NETLINK:
-		accepted->rsa.len = sizeof(accepted->rsa.u.snl);
-		accepted->sock = accept(listener->sock,
-		                        &(accepted->rsa.u.sa),
-		                        &(accepted->rsa.len));
-		if (accepted->sock == -1) {
-			free(accepted);
-			return NULL;
-		}
-		break;
+  case AF_NETLINK:
+    accepted->rsa.len = sizeof(accepted->rsa.u.snl);
+    accepted->sock = accept(listener->sock,
+			    &(accepted->rsa.u.sa),
+			    &(accepted->rsa.len));
+    if (accepted->sock == -1) {
+      free(accepted);
+      return NULL;
+    }
+    break;
 #endif
 
-	default:
-		err(ezcfg, "unknown socket family [%d]\n", domain);
-		free(accepted);
-		return NULL;
-	}
+  default:
+    err(ezcfg, "unknown socket family [%d]\n", domain);
+    free(accepted);
+    return NULL;
+  }
 
-	return accepted;
+  return accepted;
 }
 
 static struct ezcfg_socket *new_accepted_socket_datagram(const struct ezcfg_socket *listener)
 {
-	struct ezcfg_socket *accepted;
-	struct ezcfg *ezcfg;
-	int domain, type, sock_protocol;
+  struct ezcfg_socket *accepted;
+  struct ezcfg *ezcfg;
+  int domain, type, sock_protocol;
 
-	ezcfg = listener->ezcfg;
+  ezcfg = listener->ezcfg;
 
-	accepted = calloc(1, sizeof(struct ezcfg_socket));
-	if (accepted == NULL) {
-		err(ezcfg, "calloc fail: %m\n");
-		return NULL;
-	}
-	memset(accepted, 0, sizeof(struct ezcfg_socket));
-	accepted->ezcfg = ezcfg;
-	accepted->sock = -1;
-	accepted->proto = listener->proto;
-	accepted->lsa = listener->lsa;
-	accepted->rsa = listener->rsa;
-	accepted->mreq = listener->mreq;
-	accepted->need_unlink = listener->need_unlink;
-	domain = listener->domain;
-	type = listener->type;
-	accepted->domain = domain;
-	accepted->type = type;
-	accepted->buffer = NULL;
+  accepted = calloc(1, sizeof(struct ezcfg_socket));
+  if (accepted == NULL) {
+    err(ezcfg, "calloc fail: %m\n");
+    return NULL;
+  }
+  memset(accepted, 0, sizeof(struct ezcfg_socket));
+  accepted->ezcfg = ezcfg;
+  accepted->sock = -1;
+  accepted->proto = listener->proto;
+  accepted->lsa = listener->lsa;
+  accepted->rsa = listener->rsa;
+  accepted->mreq = listener->mreq;
+  accepted->need_unlink = listener->need_unlink;
+  domain = listener->domain;
+  type = listener->type;
+  accepted->domain = domain;
+  accepted->type = type;
+  accepted->buffer = NULL;
 
-	/* FIXME: should change sock_protocol w/r proto */
-	if (accepted->proto == EZCFG_PROTO_UEVENT) {
-		sock_protocol = NETLINK_KOBJECT_UEVENT;
-	}
-	else {
-		sock_protocol = 0;
-	}
+  /* FIXME: should change sock_protocol w/r proto */
+  if (accepted->proto == EZCFG_PROTO_UEVENT) {
+    sock_protocol = NETLINK_KOBJECT_UEVENT;
+  }
+  else {
+    sock_protocol = 0;
+  }
 
-	switch(domain) {
-	case AF_INET:
+  switch(domain) {
+  case AF_INET:
 #if (HAVE_EZBOX_EZCFG_IPV6 == 1)
-	case AF_INET6:
+  case AF_INET6:
 #endif
-		accepted->sock = socket(domain, type, sock_protocol);
-		if (accepted->sock == -1) {
-			free(accepted);
-			return NULL;
-		}
-		break;
+    accepted->sock = socket(domain, type, sock_protocol);
+    if (accepted->sock == -1) {
+      free(accepted);
+      return NULL;
+    }
+    break;
 
-	default:
-		info(ezcfg, "not handling socket family [%d]\n", domain);
-		break;
-	}
+  default:
+    info(ezcfg, "not handling socket family [%d]\n", domain);
+    break;
+  }
 
-	return accepted;
+  return accepted;
 }
 
 struct ezcfg_socket *ezcfg_socket_new_accepted_socket(const struct ezcfg_socket *listener)
 {
-	//struct ezcfg *ezcfg;
+  //struct ezcfg *ezcfg;
 
-	ASSERT(listener != NULL);
-	//ezcfg = listener->ezcfg;
+  ASSERT(listener != NULL);
+  //ezcfg = listener->ezcfg;
 
-	switch (listener->proto) {
-	case EZCFG_PROTO_UEVENT :
-		return new_accepted_socket_datagram(listener);
-		break;
-	case EZCFG_PROTO_UPNP_SSDP :
-		return new_accepted_socket_datagram(listener);
-		break;
-	default :
-		return new_accepted_socket_stream(listener);
-		break;
-	}
+  switch (listener->proto) {
+  case EZCFG_PROTO_UEVENT :
+    return new_accepted_socket_datagram(listener);
+    break;
+  case EZCFG_PROTO_UPNP_SSDP :
+    return new_accepted_socket_datagram(listener);
+    break;
+  default :
+    return new_accepted_socket_stream(listener);
+    break;
+  }
 }
 
 void ezcfg_socket_close_sock(struct ezcfg_socket *sp)
 {
-	//struct ezcfg *ezcfg;
+  //struct ezcfg *ezcfg;
 
-	ASSERT(sp != NULL);
+  ASSERT(sp != NULL);
 
-	//ezcfg = sp->ezcfg;
+  //ezcfg = sp->ezcfg;
 
-	if (sp->sock >= 0) {
-		close_socket_gracefully(sp->sock);
-		sp->sock = -1;
-	}
+  if (sp->sock >= 0) {
+    close_socket_gracefully(sp->sock);
+    sp->sock = -1;
+  }
 }
 
 void ezcfg_socket_set_close_on_exec(struct ezcfg_socket *sp)
 {
-	ASSERT(sp != NULL);
+  ASSERT(sp != NULL);
 
-	if (sp->sock >= 0) {
-		fcntl(sp->sock, F_SETFD, FD_CLOEXEC);
-	}
+  if (sp->sock >= 0) {
+    fcntl(sp->sock, F_SETFD, FD_CLOEXEC);
+  }
 }
 
 void ezcfg_socket_set_need_unlink(struct ezcfg_socket *sp, bool need_unlink)
 {
-	ASSERT(sp != NULL);
+  ASSERT(sp != NULL);
 
-	sp->need_unlink = need_unlink;
+  sp->need_unlink = need_unlink;
 }
 
 void ezcfg_socket_set_need_delete(struct ezcfg_socket *sp, bool need_delete)
 {
-	ASSERT(sp != NULL);
+  ASSERT(sp != NULL);
 
-	sp->need_delete = need_delete;
+  sp->need_delete = need_delete;
 }
 
 bool ezcfg_socket_get_need_delete(struct ezcfg_socket *sp)
 {
-	ASSERT(sp != NULL);
+  ASSERT(sp != NULL);
 
-	return (sp->need_delete);
+  return (sp->need_delete);
 }
 
 bool ezcfg_socket_sync_lsa(struct ezcfg_socket *dsp, const struct ezcfg_socket *ssp)
 {
-	//struct ezcfg *ezcfg;
+  //struct ezcfg *ezcfg;
 
-	ASSERT(dsp != NULL);
-	ASSERT(ssp != NULL);
-	//ezcfg = dsp->ezcfg;
+  ASSERT(dsp != NULL);
+  ASSERT(ssp != NULL);
+  //ezcfg = dsp->ezcfg;
 
-	if (dsp->proto != ssp->proto) {
-		return false;
-	}
+  if (dsp->proto != ssp->proto) {
+    return false;
+  }
 
-	dsp->lsa = ssp->lsa;
+  dsp->lsa = ssp->lsa;
 
-	return true;
+  return true;
 }
 
 bool ezcfg_socket_sync_rsa(struct ezcfg_socket *dsp, const struct ezcfg_socket *ssp)
 {
-	//struct ezcfg *ezcfg;
+  //struct ezcfg *ezcfg;
 
-	ASSERT(dsp != NULL);
-	ASSERT(ssp != NULL);
-	//ezcfg = dsp->ezcfg;
+  ASSERT(dsp != NULL);
+  ASSERT(ssp != NULL);
+  //ezcfg = dsp->ezcfg;
 
-	if (dsp->proto != ssp->proto) {
-		return false;
-	}
+  if (dsp->proto != ssp->proto) {
+    return false;
+  }
 
-	dsp->rsa = ssp->rsa;
+  dsp->rsa = ssp->rsa;
 
-	return true;
+  return true;
 }
 
 int ezcfg_socket_set_remote(struct ezcfg_socket *sp, int domain, const char *socket_path)
 {
-	struct ezcfg *ezcfg;
-	struct usa *usa;
+  struct ezcfg *ezcfg;
+  struct usa *usa;
 
-	ASSERT(sp != NULL);
-	ASSERT(socket_path != NULL);
-	ASSERT(sp->domain == domain);
+  ASSERT(sp != NULL);
+  ASSERT(socket_path != NULL);
+  ASSERT(sp->domain == domain);
 
-	ezcfg = sp->ezcfg;
-	usa = &(sp->rsa);
+  ezcfg = sp->ezcfg;
+  usa = &(sp->rsa);
 
-	switch (domain) {
-	case AF_LOCAL:
-		usa->u.sun.sun_family = AF_LOCAL;
-		strcpy(usa->u.sun.sun_path, socket_path);
-		usa->len = offsetof(struct sockaddr_un, sun_path) + strlen(usa->u.sun.sun_path);
-		/* translate leading '@' to abstract namespace */
-		if (usa->u.sun.sun_path[0] == '@')
-			usa->u.sun.sun_path[0] = '\0';
+  switch (domain) {
+  case AF_LOCAL:
+    usa->u.sun.sun_family = AF_LOCAL;
+    strcpy(usa->u.sun.sun_path, socket_path);
+    usa->len = offsetof(struct sockaddr_un, sun_path) + strlen(usa->u.sun.sun_path);
+    /* translate leading '@' to abstract namespace */
+    if (usa->u.sun.sun_path[0] == '@')
+      usa->u.sun.sun_path[0] = '\0';
 
-		break;
+    break;
 
-	default:
-		err(ezcfg, "bad family [%d]\n", domain);
-		return -EINVAL;
-	}
+  default:
+    err(ezcfg, "bad family [%d]\n", domain);
+    return -EINVAL;
+  }
 
-	return 0;
+  return 0;
 }
 
 int ezcfg_socket_connect_remote(struct ezcfg_socket *sp)
 {
-	int err = 0;
-	struct usa *usa;
-	struct ezcfg *ezcfg;
+  int err = 0;
+  struct usa *usa;
+  struct ezcfg *ezcfg;
 
-	ASSERT(sp != NULL);
+  ASSERT(sp != NULL);
 
-	ezcfg = sp->ezcfg;
-	usa = &(sp->rsa);
+  ezcfg = sp->ezcfg;
+  usa = &(sp->rsa);
 
-	switch (sp->domain) {
-	case AF_LOCAL:
-		err = connect(sp->sock, (struct sockaddr *)&usa->u.sun, usa->len);
-		break;
-	default:
-		err(ezcfg, "bad family [%d]\n", sp->domain);
-		return -EINVAL;
-	}
+  switch (sp->domain) {
+  case AF_LOCAL:
+    err = connect(sp->sock, (struct sockaddr *)&usa->u.sun, usa->len);
+    break;
+  default:
+    err(ezcfg, "bad family [%d]\n", sp->domain);
+    return -EINVAL;
+  }
 
-	if (err < 0) {
-		return err;
-	}
+  if (err < 0) {
+    return err;
+  }
 
-	/* enable receiving of sender credentials */
-	//setsockopt(sp->sock, SOL_SOCKET, SO_PASSCRED, &on, sizeof(on));
-	return 0;
+  /* enable receiving of sender credentials */
+  //setsockopt(sp->sock, SOL_SOCKET, SO_PASSCRED, &on, sizeof(on));
+  return 0;
 }
 
 int ezcfg_socket_read(struct ezcfg_socket *sp, void *buf, int len, int flags)
 {
-	struct ezcfg *ezcfg;
-	char * p;
-	int status, n;
-	int sock;
-	struct usa *rsa;
+  struct ezcfg *ezcfg;
+  char * p;
+  int status, n;
+  int sock;
+  struct usa *rsa;
 
-	ASSERT(sp != NULL);
-	ASSERT(buf != NULL);
-	ASSERT(len >= 0);
+  ASSERT(sp != NULL);
+  ASSERT(buf != NULL);
+  ASSERT(len >= 0);
 
-	ezcfg = sp->ezcfg;
-	p = buf;
-	status = 0;
-	sock = sp->sock;
-	memset(buf, '\0', len);
-	rsa = &(sp->rsa);
+  ezcfg = sp->ezcfg;
+  p = buf;
+  status = 0;
+  sock = sp->sock;
+  memset(buf, '\0', len);
+  rsa = &(sp->rsa);
 
-	while (status == 0) {
-		/* handle inet dgram */
-		if ((sp->domain == AF_INET) && (sp->type == SOCK_DGRAM)) {
-			n = recvfrom(sock, p + status, len - status, flags,
-				(struct sockaddr *)&(rsa->u.sin), &(rsa->len));
-		}
+  while (status == 0) {
+    /* handle inet dgram */
+    if ((sp->domain == AF_INET) && (sp->type == SOCK_DGRAM)) {
+      n = recvfrom(sock, p + status, len - status, flags,
+		   (struct sockaddr *)&(rsa->u.sin), &(rsa->len));
+    }
 #if (HAVE_EZBOX_EZCFG_IPV6 == 1)
-		else if ((sp->domain == AF_INET6) && (sp->type == SOCK_DGRAM)) {
-			n = recvfrom(sock, p + status, len - status, flags,
-				(struct sockaddr *)&(rsa->u.sin6), &(rsa->len));
-		}
+    else if ((sp->domain == AF_INET6) && (sp->type == SOCK_DGRAM)) {
+      n = recvfrom(sock, p + status, len - status, flags,
+		   (struct sockaddr *)&(rsa->u.sin6), &(rsa->len));
+    }
 #endif
-		else {
-			n = read(sock, p + status, len - status);
-		}
+    else {
+      n = read(sock, p + status, len - status);
+    }
 
-		if (n < 0) {
-			if (errno == EPIPE) {
-				info(ezcfg, "pipe error: %m\n");
-				return -EPIPE;
-			}
-			else if (errno == EINTR || errno == EAGAIN) {
-				info(ezcfg, "interrupted: %m\n");
-				continue;
-			}
-			else {
-				err(ezcfg, "read fail: %m\n");
-				return -errno;
-			}
-		}
+    if (n < 0) {
+      if (errno == EPIPE) {
+	info(ezcfg, "pipe error: %m\n");
+	return -EPIPE;
+      }
+      else if (errno == EINTR || errno == EAGAIN) {
+	info(ezcfg, "interrupted: %m\n");
+	continue;
+      }
+      else {
+	err(ezcfg, "read fail: %m\n");
+	return -errno;
+      }
+    }
 
-		if (n == 0) {
-			info(ezcfg, "remote end closed connection: %m\n");
-			p = buf;
-			p[len-1] = '\0';
-			break;
-		}
-		status += n;
-	}
+    if (n == 0) {
+      info(ezcfg, "remote end closed connection: %m\n");
+      p = buf;
+      p[len-1] = '\0';
+      break;
+    }
+    status += n;
+  }
 
-	return status;
+  return status;
 }
 
 int ezcfg_socket_write(struct ezcfg_socket *sp, const void *buf, int len, int flags)
 {
-	struct ezcfg *ezcfg;
-	const char *p;
-	int status, n;
-	int sock;
-	struct usa *rsa;
+  struct ezcfg *ezcfg;
+  const char *p;
+  int status, n;
+  int sock;
+  struct usa *rsa;
 
-	ASSERT(sp != NULL);
-	ASSERT(buf != NULL);
-	ASSERT(len >= 0);
+  ASSERT(sp != NULL);
+  ASSERT(buf != NULL);
+  ASSERT(len >= 0);
 
-	ezcfg = sp->ezcfg;
-	p = buf;
-	status = 0;
-	sock = sp->sock;
-	rsa = &(sp->rsa);
+  ezcfg = sp->ezcfg;
+  p = buf;
+  status = 0;
+  sock = sp->sock;
+  rsa = &(sp->rsa);
 
-	while (status != len) {
-		/* handle inet dgram */
-		if ((sp->domain == AF_INET) && (sp->type == SOCK_DGRAM)) {
-			n = sendto(sock, p + status, len - status, flags,
-				(struct sockaddr *)&(rsa->u.sin), rsa->len);
-		}
+  while (status != len) {
+    /* handle inet dgram */
+    if ((sp->domain == AF_INET) && (sp->type == SOCK_DGRAM)) {
+      n = sendto(sock, p + status, len - status, flags,
+		 (struct sockaddr *)&(rsa->u.sin), rsa->len);
+    }
 #if (HAVE_EZBOX_EZCFG_IPV6 == 1)
-		else if ((sp->domain == AF_INET6) && (sp->type == SOCK_DGRAM)) {
-			n = sendto(sock, p + status, len - status, flags,
-				(struct sockaddr *)&(rsa->u.sin6), rsa->len);
-		}
+    else if ((sp->domain == AF_INET6) && (sp->type == SOCK_DGRAM)) {
+      n = sendto(sock, p + status, len - status, flags,
+		 (struct sockaddr *)&(rsa->u.sin6), rsa->len);
+    }
 #endif
-		else {
-			n = write(sock, p + status, len - status);
-		}
-		if (n < 0) {
-			if (errno == EPIPE) {
-				info(ezcfg, "remote end closed connection: %m\n");
-				return -EPIPE;
-			}
-			else if (errno == EINTR || errno == EAGAIN) {
-				info(ezcfg, "interrupted: %m\n");
-				continue;
-			}
-			else {
-				err(ezcfg, "write fail: %m\n");
-				return -errno;
-			}
-		}
-		status += n;
-	}
+    else {
+      n = write(sock, p + status, len - status);
+    }
+    if (n < 0) {
+      if (errno == EPIPE) {
+	info(ezcfg, "remote end closed connection: %m\n");
+	return -EPIPE;
+      }
+      else if (errno == EINTR || errno == EAGAIN) {
+	info(ezcfg, "interrupted: %m\n");
+	continue;
+      }
+      else {
+	err(ezcfg, "write fail: %m\n");
+	return -errno;
+      }
+    }
+    status += n;
+  }
 
-	return status;
+  return status;
 }

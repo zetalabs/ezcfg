@@ -116,12 +116,7 @@ int ezcfg_nvram_get_num_default_nvram_propagators(void);
 
 
 /* locale/locale.c */
-struct ezcfg_locale * ezcfg_locale_new(struct ezcfg *ezcfg);
-bool ezcfg_locale_delete(struct ezcfg_locale *locale);
-bool ezcfg_locale_set_domain(struct ezcfg_locale *locale, char *domain);
-bool ezcfg_locale_set_dir(struct ezcfg_locale *locale, char *dir);
-char * ezcfg_locale_text(struct ezcfg_locale *locale, char *msgid);
-
+#include "ezcfg-priv_locale.h"
 
 /* uuid/uuid.c */
 struct ezcfg_uuid;

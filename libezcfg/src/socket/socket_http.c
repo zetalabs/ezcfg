@@ -1,4 +1,6 @@
-/* ============================================================================
+/* -*- mode: C; c-file-style: "gnu"; indent-tabs-mode: nil; -*- */
+/**
+ * ============================================================================
  * Project Name : ezbox configuration utilities
  * File Name    : socket/socket_http.c
  *
@@ -39,15 +41,15 @@
 
 #if 0
 #define DBG(format, args...) do { \
-	char path[256]; \
-	FILE *dbg_fp; \
-	snprintf(path, 256, "/tmp/%d-debug.txt", getpid()); \
-	dbg_fp = fopen(path, "a"); \
-	if (dbg_fp) { \
-		fprintf(dbg_fp, "tid=[%d] ", (int)gettid()); \
-		fprintf(dbg_fp, format, ## args); \
-		fclose(dbg_fp); \
-	} \
+    char path[256];		  \
+    FILE *dbg_fp;					    \
+    snprintf(path, 256, "/tmp/%d-debug.txt", getpid());	    \
+    dbg_fp = fopen(path, "a");				    \
+    if (dbg_fp) {					     \
+      fprintf(dbg_fp, "tid=[%d] ", (int)gettid());	     \
+      fprintf(dbg_fp, format, ## args);			     \
+      fclose(dbg_fp);					     \
+    }							     \
 } while(0)
 #else
 #define DBG(format, args...)
@@ -61,23 +63,23 @@
  */
 static int get_http_header_len(const char *buf, size_t buflen)
 {
-	const char *s, *e;
-	int len = 0;
+  const char *s, *e;
+  int len = 0;
 
-	for (s = buf, e = s + buflen - 1; len <= 0 && s < e; s++) {
-		/* Control characters are not allowed but >=128 is. */
-		if (!isprint(* (unsigned char *) s) && *s != '\r' &&
-		    *s != '\n' && * (unsigned char *) s < 128) {
-			len = -1;
-		} else if (s[0] == '\n' && s[1] == '\n') {
-			len = (int) (s - buf) + 2;
-		} else if (s[0] == '\n' && &s[1] < e &&
-			   s[1] == '\r' && s[2] == '\n') {
-			len = (int) (s - buf) + 3;
-		}
-	}
+  for (s = buf, e = s + buflen - 1; len <= 0 && s < e; s++) {
+    /* Control characters are not allowed but >=128 is. */
+    if (!isprint(* (unsigned char *) s) && *s != '\r' &&
+	*s != '\n' && * (unsigned char *) s < 128) {
+      len = -1;
+    } else if (s[0] == '\n' && s[1] == '\n') {
+      len = (int) (s - buf) + 2;
+    } else if (s[0] == '\n' && &s[1] < e &&
+	       s[1] == '\r' && s[2] == '\n') {
+      len = (int) (s - buf) + 3;
+    }
+  }
 
-	return len;
+  return len;
 }
 
 /**
@@ -92,27 +94,27 @@ static int get_http_header_len(const char *buf, size_t buflen)
  **/
 int ezcfg_socket_read_http_header(struct ezcfg_socket *sp, struct ezcfg_http *http, char *buf, int bufsiz, int *nread)
 {
-	//struct ezcfg *ezcfg;
-	int n, len;
+  //struct ezcfg *ezcfg;
+  int n, len;
 
-	ASSERT(sp != NULL);
-	ASSERT(http != NULL);
+  ASSERT(sp != NULL);
+  ASSERT(http != NULL);
 
-	//ezcfg = ezcfg_socket_get_ezcfg(sp);
+  //ezcfg = ezcfg_socket_get_ezcfg(sp);
 
-	len = 0;
+  len = 0;
 
-	while ((*nread < bufsiz) && (len == 0)) {
-		n = ezcfg_socket_read(sp, buf + *nread, bufsiz - *nread, 0);
-		if (n <= 0) {
-			break;
-		} else {
-			*nread += n;
-			len = get_http_header_len(buf, (size_t) *nread);
-		}
-	}
+  while ((*nread < bufsiz) && (len == 0)) {
+    n = ezcfg_socket_read(sp, buf + *nread, bufsiz - *nread, 0);
+    if (n <= 0) {
+      break;
+    } else {
+      *nread += n;
+      len = get_http_header_len(buf, (size_t) *nread);
+    }
+  }
 
-	return len;
+  return len;
 }
 
 /**
@@ -120,99 +122,105 @@ int ezcfg_socket_read_http_header(struct ezcfg_socket *sp, struct ezcfg_http *ht
  * Buffer buf may already have some data. The length of the data is stored in nread.
  * Upon every read operation, increase nread by the number of bytes read.
  **/
-char *ezcfg_socket_read_http_content(struct ezcfg_socket *sp, struct ezcfg_http *http, char *buf, int header_len, int *bufsiz, int *nread)
+int ezcfg_socket_read_http_content(struct ezcfg_socket *sp, struct ezcfg_http *http, char **pbuf, int header_len, int *bufsiz, int *nread)
 {
-	//struct ezcfg *ezcfg;
-	int n;
-	char *p, *q;
-	int content_length, buf_len, chunk_size;
+  //struct ezcfg *ezcfg;
+  int n;
+  char *p, *q, *buf;
+  int content_length, buf_len, chunk_size;
 
-	ASSERT(sp != NULL);
-	ASSERT(http != NULL);
+  ASSERT(sp != NULL);
+  ASSERT(http != NULL);
+  ASSERT(pbuf != NULL);
 
-	//ezcfg = ezcfg_socket_get_ezcfg(sp);
-	buf_len = *bufsiz;
+  //ezcfg = ezcfg_socket_get_ezcfg(sp);
+  buf_len = *bufsiz;
 
-	if ((p = ezcfg_http_get_header_value(http, EZCFG_HTTP_HEADER_CONTENT_LENGTH)) != NULL) {
-		content_length = atoi(p);
-		if ((*nread - header_len) < content_length) {
-			/* need to read more data from socket */
-			buf_len += (content_length - (*nread - header_len));
-			buf = realloc(buf, buf_len);
-			if (buf == NULL) {
-				return NULL;
-			}
-			*bufsiz = buf_len;
-			while (*nread < buf_len) {
-				n = ezcfg_socket_read(sp, buf + *nread, *bufsiz - *nread, 0);
-				if (n <= 0) {
-					break;
-				}
-				else {
-					*nread += n;
-				}
-			}
-
-			if ((*nread - header_len) < content_length) {
-				/* can not read all content */
-				return NULL;
-			}
-		}
+  if ((p = ezcfg_http_get_header_value(http, EZCFG_HTTP_HEADER_CONTENT_LENGTH)) != NULL) {
+    content_length = atoi(p);
+    if (content_length > EZCFG_HTTP_MAX_BUFFER_SIZE) {
+      return EZCFG_RET_BAD;
+    }
+    if ((*nread - header_len) < content_length) {
+      /* need to read more data from socket */
+      buf_len += (content_length - (*nread - header_len));
+      buf = realloc(*pbuf, buf_len);
+      if (buf == NULL) {
+	return EZCFG_RET_BAD;
+      }
+      *pbuf = buf;
+      *bufsiz = buf_len;
+      while (*nread < buf_len) {
+	n = ezcfg_socket_read(sp, buf + *nread, *bufsiz - *nread, 0);
+	if (n <= 0) {
+	  break;
 	}
-	else if ((p = ezcfg_http_get_header_value(http, EZCFG_HTTP_HEADER_TRANSFER_ENCODING)) != NULL) {
-		if (strcmp(p, "chunked") != 0) {
-			/* unknown Transfer-Encoding */
-			return NULL;
-		}
-
-		do {
-			if (buf_len <= *nread) {
-				buf_len += EZCFG_BUFFER_SIZE;
-			}
-			if (buf_len > EZCFG_HTTP_MAX_REQUEST_SIZE) {
-				/* too large for the request */
-				return NULL;
-			}
-			buf = realloc(buf, buf_len);
-			if (buf == NULL) {
-				return NULL;
-			}
-			*bufsiz = buf_len;
-			while (*nread < *bufsiz) {
-				n = ezcfg_socket_read(sp, buf + *nread, *bufsiz - *nread, 0);
-				if (n <= 0) {
-					break;
-				}
-				else {
-					*nread += n;
-				}
-			}
-		} while (*nread == buf_len);
-
-		/* concate chunk data */
-		/* 0-terminate the content */
-		buf[*nread] = '\0';
-		/* point to chunk size */
-		p = buf + header_len;
-		content_length = 0;
-		chunk_size = strtol(p, NULL, 16);
-		while((chunk_size > 0) && (chunk_size <= EZCFG_HTTP_CHUNK_SIZE)) {
-			q = strstr(p, EZCFG_HTTP_CRLF_STRING);
-			if (q == NULL) {
-				return NULL;
-			}
-			q += strlen(EZCFG_HTTP_CRLF_STRING);
-			memmove(buf + header_len + content_length, q, chunk_size);
-			content_length += chunk_size;
-			p = q + chunk_size + strlen(EZCFG_HTTP_CRLF_STRING);
-			chunk_size = strtol(p, NULL, 16);
-		}
-		if ((chunk_size < 0) || (chunk_size > EZCFG_HTTP_CHUNK_SIZE)) {
-			return NULL;
-		}
-		/* update nread */
-		*nread = header_len + content_length;
+	else {
+	  *nread += n;
 	}
+      }
 
-	return buf;
+      if ((*nread - header_len) < content_length) {
+	/* can not read all content */
+	return EZCFG_RET_BAD;
+      }
+    }
+  }
+  else if ((p = ezcfg_http_get_header_value(http, EZCFG_HTTP_HEADER_TRANSFER_ENCODING)) != NULL) {
+    if (strcmp(p, "chunked") != 0) {
+      /* unknown Transfer-Encoding */
+      return EZCFG_RET_BAD;
+    }
+
+    do {
+      if (buf_len <= *nread) {
+	buf_len += EZCFG_BUFFER_SIZE;
+      }
+      if (buf_len > EZCFG_HTTP_MAX_REQUEST_SIZE) {
+	/* too large for the request */
+	return EZCFG_RET_BAD;
+      }
+      buf = realloc(*pbuf, buf_len);
+      if (buf == NULL) {
+	return EZCFG_RET_BAD;
+      }
+      *pbuf = buf;
+      *bufsiz = buf_len;
+      while (*nread < *bufsiz) {
+	n = ezcfg_socket_read(sp, buf + *nread, *bufsiz - *nread, 0);
+	if (n <= 0) {
+	  break;
+	}
+	else {
+	  *nread += n;
+	}
+      }
+    } while (*nread == buf_len);
+
+    /* concate chunk data */
+    /* 0-terminate the content */
+    buf[*nread] = '\0';
+    /* point to chunk size */
+    p = buf + header_len;
+    content_length = 0;
+    chunk_size = strtol(p, NULL, 16);
+    while((chunk_size > 0) && (chunk_size <= EZCFG_HTTP_CHUNK_SIZE)) {
+      q = strstr(p, EZCFG_HTTP_CRLF_STRING);
+      if (q == NULL) {
+	return EZCFG_RET_BAD;
+      }
+      q += strlen(EZCFG_HTTP_CRLF_STRING);
+      memmove(buf + header_len + content_length, q, chunk_size);
+      content_length += chunk_size;
+      p = q + chunk_size + strlen(EZCFG_HTTP_CRLF_STRING);
+      chunk_size = strtol(p, NULL, 16);
+    }
+    if ((chunk_size < 0) || (chunk_size > EZCFG_HTTP_CHUNK_SIZE)) {
+      return EZCFG_RET_BAD;
+    }
+    /* update nread */
+    *nread = header_len + content_length;
+  }
+
+  return EZCFG_RET_OK;
 }

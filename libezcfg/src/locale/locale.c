@@ -1,4 +1,6 @@
-/* ============================================================================
+/* -*- mode: C; c-file-style: "gnu"; indent-tabs-mode: nil; -*- */
+/**
+ * ============================================================================
  * Project Name : ezbox configuration utilities
  * File Name    : locale.c
  *
@@ -42,119 +44,153 @@
 #include "ezcfg.h"
 #include "ezcfg-private.h"
 
+/**
+ * The locale naming convention is:
+ * language[_territory][.codeset][@modifier]
+ * example: en_US.UTF-8
+ */
+
 struct ezcfg_locale {
-	struct ezcfg *ezcfg;
-	char          domain[EZCFG_PATH_MAX];
-	char          dir[EZCFG_PATH_MAX];
+	struct ezcfg   *ezcfg;
+	char            name[EZCFG_LOCALE_MAX];
+	char            domain[EZCFG_PATH_MAX];
+	char            dir[EZCFG_PATH_MAX];
+	pthread_mutex_t mutex; /* Protects locale */
 };
 
 struct ezcfg_locale * ezcfg_locale_new(struct ezcfg *ezcfg)
 {
-	struct ezcfg_locale *locale;
+  struct ezcfg_locale *locale;
 
-	ASSERT(ezcfg != NULL);
+  ASSERT(ezcfg != NULL);
 
-	locale = (struct ezcfg_locale *)malloc(sizeof(struct ezcfg_locale));
-	memset(locale, 0, sizeof(struct ezcfg_locale));
-	locale->ezcfg = ezcfg;
-	locale->domain[0] = '\0';
-	locale->dir[0] = '\0';
+  locale = (struct ezcfg_locale *)malloc(sizeof(struct ezcfg_locale));
+  if (locale == NULL) {
+    return NULL;
+  }
+  memset(locale, 0, sizeof(struct ezcfg_locale));
+  if (pthread_mutex_init(&locale->mutex, NULL) != 0) {
+    free(locale);
+    return NULL;
+  }
+  locale->ezcfg = ezcfg;
+  locale->name[0] = '\0';
+  locale->domain[0] = '\0';
+  locale->dir[0] = '\0';
 
-	return locale;
+  return locale;
 }
 
-bool ezcfg_locale_delete(struct ezcfg_locale *locale)
+int ezcfg_locale_delete(struct ezcfg_locale *locale)
 {
-	if (locale != NULL) {
-		free(locale);
-	}
+  if (locale != NULL) {
+    free(locale);
+  }
 
-	return true;
+  return EZCFG_RET_OK;
 }
 
-bool ezcfg_locale_set_domain(struct ezcfg_locale *locale, char *domain)
+int ezcfg_locale_set_name(struct ezcfg_locale *locale, char *name)
 {
-	//struct ezcfg *ezcfg;
-	int n;
+  //struct ezcfg *ezcfg;
+  int n;
 
-	ASSERT(locale != NULL);
-	ASSERT(domain != NULL);
+  ASSERT(locale != NULL);
+  ASSERT(name != NULL);
 
-	//ezcfg = locale->ezcfg;
+  //ezcfg = locale->ezcfg;
 
-	n = snprintf(locale->domain, sizeof(locale->domain), "%s", domain);
-	if ((n >= 0) && (strcmp(locale->domain, domain) == 0)) {
-		return true;
-	}
-	else {
-		return false;
-	}
+  n = snprintf(locale->name, sizeof(locale->name), "%s", name);
+  if ((n >= 0) && (strcmp(locale->name, name) == 0)) {
+    return EZCFG_RET_OK;
+  }
+  else {
+    return EZCFG_RET_BAD;
+  }
 }
 
-bool ezcfg_locale_set_dir(struct ezcfg_locale *locale, char *dir)
+int ezcfg_locale_set_domain(struct ezcfg_locale *locale, char *domain)
 {
-	//struct ezcfg *ezcfg;
-	int n;
+  //struct ezcfg *ezcfg;
+  int n;
 
-	ASSERT(locale != NULL);
-	ASSERT(dir != NULL);
+  ASSERT(locale != NULL);
+  ASSERT(domain != NULL);
 
-	//ezcfg = locale->ezcfg;
+  //ezcfg = locale->ezcfg;
 
-	n = snprintf(locale->dir, sizeof(locale->dir), "%s", dir);
-	if ((n >= 0) && (strcmp(locale->dir, dir) == 0)) {
-		return true;
-	}
-	else {
-		return false;
-	}
+  n = snprintf(locale->domain, sizeof(locale->domain), "%s", domain);
+  if ((n >= 0) && (strcmp(locale->domain, domain) == 0)) {
+    return EZCFG_RET_OK;
+  }
+  else {
+    return EZCFG_RET_BAD;
+  }
+}
+
+int ezcfg_locale_set_dir(struct ezcfg_locale *locale, char *dir)
+{
+  //struct ezcfg *ezcfg;
+  int n;
+
+  ASSERT(locale != NULL);
+  ASSERT(dir != NULL);
+
+  //ezcfg = locale->ezcfg;
+
+  n = snprintf(locale->dir, sizeof(locale->dir), "%s", dir);
+  if ((n >= 0) && (strcmp(locale->dir, dir) == 0)) {
+    return EZCFG_RET_OK;
+  }
+  else {
+    return EZCFG_RET_BAD;
+  }
 }
 
 char * ezcfg_locale_text(struct ezcfg_locale *locale, char * msgid)
 {
 #if (HAVE_EZBOX_EZCFG_NLS == 1)
-	struct ezcfg *ezcfg;
+  struct ezcfg *ezcfg;
 #endif
-	char * p;
+  char * p;
 
-	ASSERT(msgid != NULL);
+  ASSERT(msgid != NULL);
 
-	/* no locale, return msgid directly */
-	if (locale == NULL) {
-		return msgid;
-	}
+  /* no locale, return msgid directly */
+  if (locale == NULL) {
+    return msgid;
+  }
 
 #if (HAVE_EZBOX_EZCFG_NLS == 1)
-	ezcfg = locale->ezcfg;
+  ezcfg = locale->ezcfg;
 
-	/* lock locale mutex */
-	ezcfg_common_locale_mutex_lock(ezcfg);
+  /* lock locale mutex */
+  pthread_mutex_lock(&locale->mutex);
 
-	/* set locale */
-	p = setlocale(LC_ALL, ezcfg_common_get_locale(ezcfg));
-	if (p == NULL) {
-		info(ezcfg, "setlocale error.\n");
-	}
+  p = setlocale(LC_ALL, locale->name);
+  if (p == NULL) {
+    info(ezcfg, "setlocale error.\n");
+  }
 
-	/* set directory containing message catalogs */
-	p = bindtextdomain(locale->domain, locale->dir);
-	if (p == NULL) {
-		info(ezcfg, "bindtextdomain error.\n");
-	}
+  /* set directory containing message catalogs */
+  p = bindtextdomain(locale->domain, locale->dir);
+  if (p == NULL) {
+    info(ezcfg, "bindtextdomain error.\n");
+  }
 
-	/* set domain for future gettext() calls */
-	p = textdomain(locale->domain);
-	if (p == NULL) {
-		info(ezcfg, "textdomain error.\n");
-	}
+  /* set domain for future gettext() calls */
+  p = textdomain(locale->domain);
+  if (p == NULL) {
+    info(ezcfg, "textdomain error.\n");
+  }
 
-	p = gettext(msgid);
+  p = gettext(msgid);
 
-	/* unlock gettext mutex */
-	ezcfg_common_locale_mutex_unlock(ezcfg);
+  /* unlock locale mutex */
+  pthread_mutex_unlock(&locale->mutex);
 #else
-	p = msgid;
+  p = msgid;
 #endif
 
-	return p;
+  return p;
 }

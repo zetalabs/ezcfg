@@ -1,4 +1,6 @@
-/* ============================================================================
+/* -*- mode: C; c-file-style: "gnu"; indent-tabs-mode: nil; -*- */
+/**
+ * ============================================================================
  * Project Name : ezbox Configuration Daemon
  * Module Name  : env_action_load_modules.c
  *
@@ -45,63 +47,67 @@
 #ifdef _EXEC_
 int main(int argc, char **argv)
 #else
-int env_action_load_modules(int argc, char **argv)
+  int env_action_load_modules(int argc, char **argv)
 #endif
 {
-	FILE *file = NULL;
-	char buf[32];
-	int ret, flag;
+  FILE *file = NULL;
+  char buf[32];
+  int ret, flag, rc;
 
-	if (argc < 2) {
-		return (EXIT_FAILURE);
-	}
+  if (argc < 2) {
+    return (EXIT_FAILURE);
+  }
 
-	if (strcmp(argv[0], "load_modules")) {
-		return (EXIT_FAILURE);
-	}
+  if (strcmp(argv[0], "load_modules")) {
+    return (EXIT_FAILURE);
+  }
 
-	if (utils_init_ezcfg_api(EZCD_CONFIG_FILE_PATH) == false) {
-		return (EXIT_FAILURE);
-	}
+  if (utils_init_ezcfg_api(EZCD_CONFIG_FILE_PATH) == false) {
+    return (EXIT_FAILURE);
+  }
 
-	flag = utils_get_rc_act_type(argv[1]);
+  flag = utils_get_rc_act_type(argv[1]);
 
-	/* first generate /etc/modules */
-	pop_etc_modules(flag);
+  /* first generate /etc/modules */
+  pop_etc_modules(flag);
 
-	file = fopen("/etc/modules", "r");
-	if (file == NULL) {
-		return (EXIT_FAILURE);
-	}
+  file = fopen("/etc/modules", "r");
+  if (file == NULL) {
+    return (EXIT_FAILURE);
+  }
 
-	switch (flag) {
-	case RC_ACT_BOOT :
-	case RC_ACT_START :
-		/* generate modules dependency */
-		utils_system(CMD_DEPMOD);
+  switch (flag) {
+  case RC_ACT_BOOT :
+  case RC_ACT_START :
+    /* generate modules dependency */
+    utils_system(CMD_DEPMOD);
 
-		while (utils_file_get_line(file,
-			 buf, sizeof(buf), "#", LINE_TAIL_STRING) == true) {
-			//ret = utils_install_kernel_module(buf, NULL);
-			ret = utils_probe_kernel_module(buf, NULL);
-		}
-		ret = EXIT_SUCCESS;
-		break;
+    ret = EXIT_SUCCESS;
+    while (utils_file_get_line(file,
+			       buf, sizeof(buf), "#", LINE_TAIL_STRING) == true) {
+      //ret = utils_install_kernel_module(buf, NULL);
+      rc = utils_probe_kernel_module(buf, NULL);
+      if (rc != EXIT_SUCCESS)
+	ret = EXIT_FAILURE;
+    }
+    break;
 
-	case RC_ACT_STOP :
-		while (utils_file_get_line(file,
-			 buf, sizeof(buf), "#", LINE_TAIL_STRING) == true) {
-			//ret = utils_remove_kernel_module(buf);
-			ret = utils_clean_kernel_module(buf);
-		}
-		ret = EXIT_SUCCESS;
-		break;
+  case RC_ACT_STOP :
+    ret = EXIT_SUCCESS;
+    while (utils_file_get_line(file,
+			       buf, sizeof(buf), "#", LINE_TAIL_STRING) == true) {
+      //ret = utils_remove_kernel_module(buf);
+      rc = utils_clean_kernel_module(buf);
+      if (rc != EXIT_SUCCESS)
+	ret = EXIT_FAILURE;
+    }
+    break;
 
-	default :
-		ret = EXIT_FAILURE;
-		break;
-	}
+  default :
+    ret = EXIT_FAILURE;
+    break;
+  }
 
-	fclose(file);
-	return (ret);
+  fclose(file);
+  return (ret);
 }

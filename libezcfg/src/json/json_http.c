@@ -1,4 +1,6 @@
-/* ============================================================================
+/* -*- mode: C; c-file-style: "gnu"; indent-tabs-mode: nil; -*- */
+/**
+ * ============================================================================
  * Project Name : ezbox configuration utilities
  * File Name    : json/json_http.c
  *
@@ -30,17 +32,17 @@
 #include "ezcfg-json_http.h"
 
 #if 0
-#define DBG(format, args...) do { \
-	char path[256]; \
-	FILE *dbg_fp; \
-	snprintf(path, 256, "/tmp/%d-debug.txt", getpid()); \
-	dbg_fp = fopen(path, "a"); \
-	if (dbg_fp) { \
-		fprintf(dbg_fp, "tid=[%d] ", (int)gettid()); \
-		fprintf(dbg_fp, format, ## args); \
-		fclose(dbg_fp); \
-	} \
-} while(0)
+#define DBG(format, args...) do {			\
+    char path[256];					\
+    FILE *dbg_fp;					\
+    snprintf(path, 256, "/tmp/%d-debug.txt", getpid()); \
+    dbg_fp = fopen(path, "a");				\
+    if (dbg_fp) {					\
+      fprintf(dbg_fp, "tid=[%d] ", (int)gettid());	\
+      fprintf(dbg_fp, format, ## args);			\
+      fclose(dbg_fp);					\
+    }							\
+  } while(0)
 #else
 #define DBG(format, args...)
 #endif
@@ -48,20 +50,20 @@
 
 /* for SOAP/HTTP binding request methods */
 static const char *json_http_method_strings[] = {
-	/* bad method string */
-	NULL ,
-	/* JSON over HTTP used methods */
-	EZCFG_JSON_HTTP_METHOD_POST ,
+  /* bad method string */
+  NULL ,
+  /* JSON over HTTP used methods */
+  EZCFG_JSON_HTTP_METHOD_POST ,
 };
 
 /* for JSON over HTTP binding known header */
 static const char *json_http_header_strings[] = {
-	/* bad header string */
-	NULL ,
-	/* JSON over HTTP binding known headers */
-	EZCFG_JSON_HTTP_HEADER_HOST ,
-	EZCFG_JSON_HTTP_HEADER_CONTENT_TYPE ,
-	EZCFG_JSON_HTTP_HEADER_CONTENT_LENGTH ,
+  /* bad header string */
+  NULL ,
+  /* JSON over HTTP binding known headers */
+  EZCFG_JSON_HTTP_HEADER_HOST ,
+  EZCFG_JSON_HTTP_HEADER_CONTENT_TYPE ,
+  EZCFG_JSON_HTTP_HEADER_CONTENT_LENGTH ,
 };
 
 /**
@@ -69,19 +71,19 @@ static const char *json_http_header_strings[] = {
  **/
 void ezcfg_json_http_delete(struct ezcfg_json_http *jh)
 {
-	//struct ezcfg *ezcfg;
+  //struct ezcfg *ezcfg;
 
-	ASSERT(jh != NULL);
+  ASSERT(jh != NULL);
 
-	//ezcfg = sh->ezcfg;
+  //ezcfg = sh->ezcfg;
 
-	if (jh->json != NULL)
-		ezcfg_json_delete(jh->json);
+  if (jh->json != NULL)
+    ezcfg_json_delete(jh->json);
 
-	if (jh->http != NULL)
-		ezcfg_http_delete(jh->http);
+  if (jh->http != NULL)
+    ezcfg_http_delete(jh->http);
 
-	free(jh);
+  free(jh);
 }
 
 /**
@@ -91,292 +93,295 @@ void ezcfg_json_http_delete(struct ezcfg_json_http *jh)
  **/
 struct ezcfg_json_http *ezcfg_json_http_new(struct ezcfg *ezcfg)
 {
-	struct ezcfg_json_http *jh;
+  struct ezcfg_json_http *jh;
 
-	ASSERT(ezcfg != NULL);
+  ASSERT(ezcfg != NULL);
 
-	/* initialize json http binding info builder data structure */
-	jh = calloc(1, sizeof(struct ezcfg_json_http));
-	if (jh == NULL) {
-		err(ezcfg, "initialize json http binding builder error.\n");
-		return NULL;
-	}
+  /* initialize json http binding info builder data structure */
+  jh = calloc(1, sizeof(struct ezcfg_json_http));
+  if (jh == NULL) {
+    err(ezcfg, "initialize json http binding builder error.\n");
+    return NULL;
+  }
 
-	jh->json = ezcfg_json_new(ezcfg);
-	if (jh->json == NULL) {
-		ezcfg_json_http_delete(jh);
-		return NULL;
-	}
+  jh->json = ezcfg_json_new(ezcfg);
+  if (jh->json == NULL) {
+    ezcfg_json_http_delete(jh);
+    return NULL;
+  }
 
-	jh->http = ezcfg_http_new(ezcfg);
-	if (jh->http == NULL) {
-		ezcfg_json_http_delete(jh);
-		return NULL;
-	}
+  jh->http = ezcfg_http_new(ezcfg);
+  if (jh->http == NULL) {
+    ezcfg_json_http_delete(jh);
+    return NULL;
+  }
 
-	jh->ezcfg = ezcfg;
-	ezcfg_http_set_method_strings(jh->http, json_http_method_strings, ARRAY_SIZE(json_http_method_strings) - 1);
-	ezcfg_http_set_known_header_strings(jh->http, json_http_header_strings, ARRAY_SIZE(json_http_header_strings) - 1);
+  jh->ezcfg = ezcfg;
+  ezcfg_http_set_method_strings(jh->http, json_http_method_strings, ARRAY_SIZE(json_http_method_strings) - 1);
+  ezcfg_http_set_known_header_strings(jh->http, json_http_header_strings, ARRAY_SIZE(json_http_header_strings) - 1);
 
-	return jh;
+  return jh;
 }
 
 unsigned short ezcfg_json_http_get_http_version_major(struct ezcfg_json_http *jh)
 {
-	//struct ezcfg *ezcfg;
+  //struct ezcfg *ezcfg;
 
-	ASSERT(jh != NULL);
-	ASSERT(jh->http != NULL);
+  ASSERT(jh != NULL);
+  ASSERT(jh->http != NULL);
 
-	//ezcfg = jh->ezcfg;
+  //ezcfg = jh->ezcfg;
 
-	return ezcfg_http_get_version_major(jh->http);
+  return ezcfg_http_get_version_major(jh->http);
 }
 
 unsigned short ezcfg_json_http_get_http_version_minor(struct ezcfg_json_http *jh)
 {
-	//struct ezcfg *ezcfg;
+  //struct ezcfg *ezcfg;
 
-	ASSERT(jh != NULL);
-	ASSERT(jh->http != NULL);
+  ASSERT(jh != NULL);
+  ASSERT(jh->http != NULL);
 
-	//ezcfg = jh->ezcfg;
+  //ezcfg = jh->ezcfg;
 
-	return ezcfg_http_get_version_minor(jh->http);
+  return ezcfg_http_get_version_minor(jh->http);
 }
 
 bool ezcfg_json_http_set_http_version_major(struct ezcfg_json_http *jh, unsigned short major)
 {
-	//struct ezcfg *ezcfg;
+  //struct ezcfg *ezcfg;
 
-	ASSERT(jh != NULL);
-	ASSERT(jh->http != NULL);
+  ASSERT(jh != NULL);
+  ASSERT(jh->http != NULL);
 
-	//ezcfg = jh->ezcfg;
+  //ezcfg = jh->ezcfg;
 
-	return ezcfg_http_set_version_major(jh->http, major);
+  return ezcfg_http_set_version_major(jh->http, major);
 }
 
 bool ezcfg_json_http_set_http_version_minor(struct ezcfg_json_http *jh, unsigned short minor)
 {
-	//struct ezcfg *ezcfg;
+  //struct ezcfg *ezcfg;
 
-	ASSERT(jh != NULL);
-	ASSERT(jh->http != NULL);
+  ASSERT(jh != NULL);
+  ASSERT(jh->http != NULL);
 
-	//ezcfg = jh->ezcfg;
+  //ezcfg = jh->ezcfg;
 
-	return ezcfg_http_set_version_minor(jh->http, minor);
+  return ezcfg_http_set_version_minor(jh->http, minor);
 }
 
 struct ezcfg_json *ezcfg_json_http_get_json(struct ezcfg_json_http *jh)
 {
-	//struct ezcfg *ezcfg;
+  //struct ezcfg *ezcfg;
 
-	ASSERT(jh != NULL);
-	ASSERT(jh->json != NULL);
+  ASSERT(jh != NULL);
+  ASSERT(jh->json != NULL);
 
-	//ezcfg = jh->ezcfg;
+  //ezcfg = jh->ezcfg;
 
-	return jh->json;
+  return jh->json;
 }
 
 struct ezcfg_http *ezcfg_json_http_get_http(struct ezcfg_json_http *jh)
 {
-	//struct ezcfg *ezcfg;
+  //struct ezcfg *ezcfg;
 
-	ASSERT(jh != NULL);
-	ASSERT(jh->http != NULL);
+  ASSERT(jh != NULL);
+  ASSERT(jh->http != NULL);
 
-	//ezcfg = jh->ezcfg;
+  //ezcfg = jh->ezcfg;
 
-	return jh->http;
+  return jh->http;
 }
 
 char *ezcfg_json_http_get_http_header_value(struct ezcfg_json_http *jh, char *name)
 {
-	//struct ezcfg *ezcfg;
+  //struct ezcfg *ezcfg;
 
-	ASSERT(jh != NULL);
-	ASSERT(jh->http != NULL);
+  ASSERT(jh != NULL);
+  ASSERT(jh->http != NULL);
 
-	//ezcfg = jh->ezcfg;
+  //ezcfg = jh->ezcfg;
 
-        return ezcfg_http_get_header_value(jh->http, name);
+  return ezcfg_http_get_header_value(jh->http, name);
 }
 
 void ezcfg_json_http_reset_attributes(struct ezcfg_json_http *jh)
 {
-	//struct ezcfg *ezcfg;
+  //struct ezcfg *ezcfg;
 
-	ASSERT(jh != NULL);
-	ASSERT(jh->http != NULL);
-	ASSERT(jh->json != NULL);
+  ASSERT(jh != NULL);
+  ASSERT(jh->http != NULL);
+  ASSERT(jh->json != NULL);
 
-	//ezcfg = jh->ezcfg;
+  //ezcfg = jh->ezcfg;
 
-	ezcfg_http_reset_attributes(jh->http);
-	ezcfg_json_reset(jh->json);
+  ezcfg_http_reset_attributes(jh->http);
+  ezcfg_json_reset(jh->json);
 }
 
 void ezcfg_json_http_dump(struct ezcfg_json_http *jh)
 {
-	//struct ezcfg *ezcfg;
+  //struct ezcfg *ezcfg;
 
-	ASSERT(jh != NULL);
+  ASSERT(jh != NULL);
 
-	//ezcfg = jh->ezcfg;
+  //ezcfg = jh->ezcfg;
 }
 
 bool ezcfg_json_http_parse_header(struct ezcfg_json_http *jh, char *buf, int len)
 {
-	//struct ezcfg *ezcfg;
-	struct ezcfg_http *http;
+  //struct ezcfg *ezcfg;
+  struct ezcfg_http *http;
 
-	ASSERT(jh != NULL);
-	ASSERT(jh->http != NULL);
+  ASSERT(jh != NULL);
+  ASSERT(jh->http != NULL);
 
-	//ezcfg = jh->ezcfg;
-	http = jh->http;
+  //ezcfg = jh->ezcfg;
+  http = jh->http;
 
-	if (ezcfg_http_parse_header(http, buf, len) == false) {
-		return false;
-	}
+  if (ezcfg_http_parse_header(http, buf, len) == false) {
+    return false;
+  }
 
-	return true;
+  return true;
 }
 
 bool ezcfg_json_http_parse_message_body(struct ezcfg_json_http *jh)
 {
-	//struct ezcfg *ezcfg;
-	struct ezcfg_http *http;
-	struct ezcfg_json *json;
-	char *msg_body;
-	int msg_body_len;
+  //struct ezcfg *ezcfg;
+  struct ezcfg_http *http;
+  struct ezcfg_json *json;
+  char *msg_body;
+  int msg_body_len;
 
-	ASSERT(jh != NULL);
-	ASSERT(jh->http != NULL);
-	ASSERT(jh->json != NULL);
+  ASSERT(jh != NULL);
+  ASSERT(jh->http != NULL);
+  ASSERT(jh->json != NULL);
 
-	//ezcfg = jh->ezcfg;
-	http = jh->http;
-	json = jh->json;
+  //ezcfg = jh->ezcfg;
+  http = jh->http;
+  json = jh->json;
 
-	msg_body = ezcfg_http_get_message_body(http);
-	msg_body_len = ezcfg_http_get_message_body_len(http);
+  msg_body = ezcfg_http_get_message_body(http);
+  msg_body_len = ezcfg_http_get_message_body_len(http);
 
-	if (msg_body != NULL && msg_body_len > 0) {
-		if (ezcfg_json_parse_text(json, msg_body, msg_body_len) == false) {
-			return false;
-		}
-	}
+  if (msg_body != NULL && msg_body_len > 0) {
+    if (ezcfg_json_parse_text(json, msg_body, msg_body_len) == false) {
+      return false;
+    }
+  }
 
-	return true;
+  return true;
 }
 
 char *ezcfg_json_http_set_message_body(struct ezcfg_json_http *jh, const char *body, const int len)
 {
-	//struct ezcfg *ezcfg;
-	struct ezcfg_http *http;
+  //struct ezcfg *ezcfg;
+  struct ezcfg_http *http;
 
-	ASSERT(jh != NULL);
-	ASSERT(jh->http != NULL);
+  ASSERT(jh != NULL);
+  ASSERT(jh->http != NULL);
 
-	//ezcfg = jh->ezcfg;
-	http = jh->http;
+  //ezcfg = jh->ezcfg;
+  http = jh->http;
 
-	return ezcfg_http_set_message_body(http, body, len);
+  return ezcfg_http_set_message_body(http, body, len);
 }
 
 int ezcfg_json_http_get_message_length(struct ezcfg_json_http *jh)
 {
-	//struct ezcfg *ezcfg;
-	struct ezcfg_http *http;
+  //struct ezcfg *ezcfg;
+  struct ezcfg_http *http;
 
-	int n, count;
+  int n, count;
 
-	ASSERT(jh != NULL);
-	ASSERT(jh->http != NULL);
+  ASSERT(jh != NULL);
+  ASSERT(jh->http != NULL);
 
-	//ezcfg = jh->ezcfg;
-	http = jh->http;
+  //ezcfg = jh->ezcfg;
+  http = jh->http;
 
-	count = 0;
-	n = ezcfg_http_get_start_line_length(http);
-	if (n < 0) {
-		return -1;
-	}
-	count += n;
+  count = 0;
+  n = ezcfg_http_get_start_line_length(http);
+  if (n < 0) {
+    return -1;
+  }
+  count += n;
 
-	n = ezcfg_http_get_headers_length(http);
-	if (n < 0) {
-		return -1;
-	}
-	count += n;
+  n = ezcfg_http_get_headers_length(http);
+  if (n < 0) {
+    return -1;
+  }
+  count += n;
 
-	n = ezcfg_http_get_crlf_length(http);
-	if (n < 0) {
-		return -1;
-	}
-	count += n;
+  n = ezcfg_http_get_crlf_length(http);
+  if (n < 0) {
+    return -1;
+  }
+  count += n;
 
-	n = ezcfg_http_get_message_body_len(http);
-	if (n < 0) {
-		return -1;
-	}
-	count += n;
-	return count;
+  n = ezcfg_http_get_message_body_len(http);
+  if (n < 0) {
+    return -1;
+  }
+  count += n;
+  return count;
 }
 
 int ezcfg_json_http_write_message(struct ezcfg_json_http *jh, char *buf, int len)
 {
-	struct ezcfg *ezcfg;
-	struct ezcfg_http *http;
-	//struct ezcfg_json *json;
+  struct ezcfg *ezcfg;
+  struct ezcfg_http *http;
+  //struct ezcfg_json *json;
 
-	char *p;
-	int n;
+  char *p;
+  int n;
 
-	ASSERT(jh != NULL);
-	ASSERT(jh->http != NULL);
-	ASSERT(jh->json != NULL);
-	ASSERT(buf != NULL);
-	ASSERT(len > 0);
+  ASSERT(jh != NULL);
+  ASSERT(jh->http != NULL);
+  ASSERT(jh->json != NULL);
+  ASSERT(buf != NULL);
+  ASSERT(len > 0);
 
-	ezcfg = jh->ezcfg;
-	http = jh->http;
-	//json= jh->json;
+  ezcfg = jh->ezcfg;
+  http = jh->http;
+  //json= jh->json;
 
-	p = buf; n = 0;
-	n = ezcfg_http_write_start_line(http, p, len);
-	if (n < 0) {
-		err(ezcfg, "ezcfg_http_write_start_line\n");
-		return n;
-	}
-	p += n; len -= n;
+  p = buf;
+  n = ezcfg_http_write_start_line(http, p, len);
+  if (n < 0) {
+    err(ezcfg, "ezcfg_http_write_start_line\n");
+    return n;
+  }
+  p += n;
+  len -= n;
 
-	n = ezcfg_http_write_headers(http, p, len);
-	if (n < 0) {
-		err(ezcfg, "ezcfg_http_write_headers\n");
-		return n;
-	}
-	p += n; len -= n;
+  n = ezcfg_http_write_headers(http, p, len);
+  if (n < 0) {
+    err(ezcfg, "ezcfg_http_write_headers\n");
+    return n;
+  }
+  p += n;
+  len -= n;
 
-	n = ezcfg_http_write_crlf(http, p, len);
-	if (n < 0) {
-		err(ezcfg, "ezcfg_http_write_crlf\n");
-		return n;
-	}
-	p += n; len -= n;
+  n = ezcfg_http_write_crlf(http, p, len);
+  if (n < 0) {
+    err(ezcfg, "ezcfg_http_write_crlf\n");
+    return n;
+  }
+  p += n;
+  len -= n;
 
-	if (ezcfg_http_get_message_body(http) != NULL) {
-		n = ezcfg_http_write_message_body(http, p, len);
-		if (n < 0) {
-			err(ezcfg, "ezcfg_http_write_message_body\n");
-			return n;
-		}
-		p += n; len -= n;
-	}
+  if (ezcfg_http_get_message_body(http) != NULL) {
+    n = ezcfg_http_write_message_body(http, p, len);
+    if (n < 0) {
+      err(ezcfg, "ezcfg_http_write_message_body\n");
+      return n;
+    }
+    p += n;
+  }
 
-	return (p-buf);
+  return (p-buf);
 }

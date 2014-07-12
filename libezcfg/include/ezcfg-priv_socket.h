@@ -71,6 +71,6 @@ int ezcfg_socket_write(struct ezcfg_socket *sp, const void *buf, int len, int fl
 
 /* socket/socket_http.c */
 int ezcfg_socket_read_http_header(struct ezcfg_socket *sp, struct ezcfg_http *http, char *buf, int bufsiz, int *nread);
-char *ezcfg_socket_read_http_content(struct ezcfg_socket *sp, struct ezcfg_http *http, char *buf, int header_len, int *bufsiz, int *nread);
+int ezcfg_socket_read_http_content(struct ezcfg_socket *sp, struct ezcfg_http *http, char **pbuf, int header_len, int *bufsiz, int *nread);
 
 #endif /* _EZCFG_PRIV_SOCKET_H_ */

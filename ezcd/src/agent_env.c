@@ -140,7 +140,6 @@ static void init_halt_reboot_poweroff(int sig)
   } alias;
   char *stop_argv[] = { "agent", "env", "stop", NULL };
   sigset_t set;
-  pid_t pid;
 
   /* reset signal handlers */
   signal(SIGUSR1, SIG_DFL);
@@ -190,9 +189,12 @@ static void init_halt_reboot_poweroff(int sig)
     p = "poweroff";
     rb = RB_POWER_OFF;
   }
-  DBG("<6>agent_env: Requesting system %s", p);
-  pid = vfork();
-  if (pid == 0) { /* child */
+
+  if (p != NULL) {
+    DBG("<6>agent_env: Requesting system %s", p);
+  }
+
+  if (fork() == 0) { /* child */
     reboot(rb);
     _exit(EXIT_SUCCESS);
   }
@@ -222,6 +224,10 @@ int agent_env_main(int argc, char **argv)
 
   /* unset umask */
   s = chdir("/");
+  if (s == -1) {
+    DBG("<6>agent_env: chdir error!\n");
+    return (EXIT_FAILURE);
+  }
   umask(0);
 
   /* make the command line just say "agent_env"  - thats all, nothing else */
@@ -395,8 +401,14 @@ int agent_env_main(int argc, char **argv)
     p = "reboot";
   else if (rb == RB_POWER_OFF)
     p = "poweroff";
-  DBG("<6>agent_env: Requesting system %s", p);
-  if (vfork() == 0) {
+  else
+    p = NULL;
+
+  if (p != NULL) {
+    DBG("<6>agent_env: Requesting system %s", p);
+  }
+
+  if (fork() == 0) {
     /* child */
     reboot(rb);
     _exit(EXIT_SUCCESS);

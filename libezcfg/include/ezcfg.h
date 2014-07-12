@@ -346,6 +346,7 @@
 
 /* ezcfg http definitions */
 #define EZCFG_HTTP_MAX_HEADERS         64 /* must be less than 256 */
+#define EZCFG_HTTP_MAX_BUFFER_SIZE     (8*1024*1024) /* 8M bytes*/
 #define EZCFG_HTTP_CHUNK_SIZE          20480
 #define EZCFG_HTTP_MAX_CHUNK_NUM       32
 #define EZCFG_HTTP_MAX_REQUEST_SIZE    (EZCFG_HTTP_CHUNK_SIZE * EZCFG_HTTP_MAX_CHUNK_NUM)

@@ -1,4 +1,6 @@
-/* ============================================================================
+/* -*- mode: C; c-file-style: "gnu"; indent-tabs-mode: nil; -*- */
+/**
+ * ============================================================================
  * Project Name : ezbox configuration utilities
  * Module Name  : utils/utils_system.c
  *
@@ -31,17 +33,17 @@
 
 int utils_system(const char *command)
 {
-	char buf[RC_COMMAND_LINE_SIZE];
-	char *argv[RC_MAX_ARGS];
+  char buf[RC_COMMAND_LINE_SIZE];
+  char *argv[RC_MAX_ARGS];
 
-	if (command == NULL)
-		return -1;
-	if (strlen(command) > (sizeof(buf) - 1))
-		return -1;
+  if (command == NULL)
+    return -1;
+  if (strlen(command) > (sizeof(buf) - 1))
+    return -1;
 
-	snprintf(buf, sizeof(buf), "%s", command);
-	if (utils_parse_args(buf, strlen(buf) + 1, argv) < 1)
-		return -1;
+  snprintf(buf, sizeof(buf), "%s", command);
+  if (utils_parse_args(buf, strlen(buf) + 1, argv) < 1)
+    return -1;
 
-	return utils_execute(argv, NULL, NULL, 0, NULL);
+  return utils_execute(argv, NULL, NULL, 0, NULL);
 }

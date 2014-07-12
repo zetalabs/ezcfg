@@ -95,6 +95,11 @@ static int build_nvram_get_response(struct ezcfg_soap_http *sh, struct ezcfg_nvr
 
     /* Body child getNvram part */
     getnv_index = ezcfg_soap_add_body_child(soap, body_index, -1, EZCFG_SOAP_NVRAM_GETNV_RESPONSE_ELEMENT_NAME, NULL);
+    if (getnv_index < 0) {
+      err(ezcfg, "ezcfg_soap_add_body_child\n");
+      rc = -1;
+      goto exit;
+    }
     ezcfg_soap_add_body_child_attribute(soap, getnv_index, EZCFG_SOAP_NVRAM_ATTR_NS_NAME, EZCFG_SOAP_NVRAM_ATTR_NS_VALUE, EZCFG_XML_ELEMENT_ATTRIBUTE_TAIL);
 
     /* nvram name part */
@@ -184,18 +189,43 @@ static int build_nvram_get_response(struct ezcfg_soap_http *sh, struct ezcfg_nvr
 
     /* SOAP Fault part */
     fault_index = ezcfg_soap_add_body_child(soap, body_index, -1, EZCFG_SOAP_FAULT_ELEMENT_NAME, NULL);
+    if (fault_index < 0) {
+      err(ezcfg, "ezcfg_soap_add_body_child\n");
+      rc = -1;
+      goto exit;
+    }
 
     /* SOAP Fault Code part */
     code_index = ezcfg_soap_add_body_child(soap, fault_index, -1, EZCFG_SOAP_CODE_ELEMENT_NAME, NULL);
+    if (code_index < 0) {
+      err(ezcfg, "ezcfg_soap_add_body_child\n");
+      rc = -1;
+      goto exit;
+    }
 
     /* SOAP Fault Code value part */
     child_index = ezcfg_soap_add_body_child(soap, code_index, -1, EZCFG_SOAP_VALUE_ELEMENT_NAME, EZCFG_SOAP_VALUE_ELEMENT_VALUE);
+    if (child_index < 0) {
+      err(ezcfg, "ezcfg_soap_add_body_child\n");
+      rc = -1;
+      goto exit;
+    }
 
     /* SOAP Fault Reason part */
     reason_index = ezcfg_soap_add_body_child(soap, fault_index, -1, EZCFG_SOAP_REASON_ELEMENT_NAME, NULL);
+    if (reason_index < 0) {
+      err(ezcfg, "ezcfg_soap_add_body_child\n");
+      rc = -1;
+      goto exit;
+    }
 
     /* SOAP Fault Reason Text part */
     child_index = ezcfg_soap_add_body_child(soap, reason_index, -1, EZCFG_SOAP_TEXT_ELEMENT_NAME, EZCFG_SOAP_NVRAM_INVALID_NAME_FAULT_VALUE);
+    if (child_index < 0) {
+      err(ezcfg, "ezcfg_soap_add_body_child\n");
+      rc = -1;
+      goto exit;
+    }
 
     msg_len = ezcfg_soap_get_message_length(soap);
     if (msg_len < 0) {
@@ -300,6 +330,11 @@ static int build_nvram_set_response(struct ezcfg_soap_http *sh, struct ezcfg_nvr
 
     /* Body child setNvram part */
     setnv_index = ezcfg_soap_add_body_child(soap, body_index, -1, EZCFG_SOAP_NVRAM_SETNV_RESPONSE_ELEMENT_NAME, NULL);
+    if (setnv_index < 0) {
+      err(ezcfg, "ezcfg_soap_add_body_child\n");
+      rc = -1;
+      goto exit;
+    }
     ezcfg_soap_add_body_child_attribute(soap, setnv_index, EZCFG_SOAP_NVRAM_ATTR_NS_NAME, EZCFG_SOAP_NVRAM_ATTR_NS_VALUE, EZCFG_XML_ELEMENT_ATTRIBUTE_TAIL);
 
     /* nvram result part */
@@ -372,18 +407,43 @@ static int build_nvram_set_response(struct ezcfg_soap_http *sh, struct ezcfg_nvr
 
     /* SOAP Fault part */
     fault_index = ezcfg_soap_add_body_child(soap, body_index, -1, EZCFG_SOAP_FAULT_ELEMENT_NAME, NULL);
+    if (fault_index < 0) {
+      err(ezcfg, "ezcfg_soap_add_body_child\n");
+      rc = -1;
+      goto exit;
+    }
 
     /* SOAP Fault Code part */
     code_index = ezcfg_soap_add_body_child(soap, fault_index, -1, EZCFG_SOAP_CODE_ELEMENT_NAME, NULL);
+    if (code_index < 0) {
+      err(ezcfg, "ezcfg_soap_add_body_child\n");
+      rc = -1;
+      goto exit;
+    }
 
     /* SOAP Fault Code value part */
     child_index = ezcfg_soap_add_body_child(soap, code_index, -1, EZCFG_SOAP_VALUE_ELEMENT_NAME, EZCFG_SOAP_VALUE_ELEMENT_VALUE);
+    if (child_index < 0) {
+      err(ezcfg, "ezcfg_soap_add_body_child\n");
+      rc = -1;
+      goto exit;
+    }
 
     /* SOAP Fault Reason part */
     reason_index = ezcfg_soap_add_body_child(soap, fault_index, -1, EZCFG_SOAP_REASON_ELEMENT_NAME, NULL);
+    if (reason_index < 0) {
+      err(ezcfg, "ezcfg_soap_add_body_child\n");
+      rc = -1;
+      goto exit;
+    }
 
     /* SOAP Fault Reason Text part */
     child_index = ezcfg_soap_add_body_child(soap, reason_index, -1, EZCFG_SOAP_TEXT_ELEMENT_NAME, EZCFG_SOAP_NVRAM_INVALID_VALUE_FAULT_VALUE);
+    if (child_index < 0) {
+      err(ezcfg, "ezcfg_soap_add_body_child\n");
+      rc = -1;
+      goto exit;
+    }
 
     msg_len = ezcfg_soap_get_message_length(soap);
     if (msg_len < 0) {
@@ -483,6 +543,11 @@ static int build_nvram_unset_response(struct ezcfg_soap_http *sh, struct ezcfg_n
 
     /* Body child unsetNvram part */
     unsetnv_index = ezcfg_soap_add_body_child(soap, body_index, -1, EZCFG_SOAP_NVRAM_UNSETNV_RESPONSE_ELEMENT_NAME, NULL);
+    if (unsetnv_index < 0) {
+      err(ezcfg, "ezcfg_soap_add_body_child\n");
+      rc = -1;
+      goto exit;
+    }
     ezcfg_soap_add_body_child_attribute(soap, unsetnv_index, EZCFG_SOAP_NVRAM_ATTR_NS_NAME, EZCFG_SOAP_NVRAM_ATTR_NS_VALUE, EZCFG_XML_ELEMENT_ATTRIBUTE_TAIL);
 
     /* nvram result part */
@@ -560,18 +625,43 @@ static int build_nvram_unset_response(struct ezcfg_soap_http *sh, struct ezcfg_n
 
     /* SOAP Fault part */
     fault_index = ezcfg_soap_add_body_child(soap, body_index, -1, EZCFG_SOAP_FAULT_ELEMENT_NAME, NULL);
+    if (fault_index < 0) {
+      err(ezcfg, "ezcfg_soap_add_body_child\n");
+      rc = -1;
+      goto exit;
+    }
 
     /* SOAP Fault Code part */
     code_index = ezcfg_soap_add_body_child(soap, fault_index, -1, EZCFG_SOAP_CODE_ELEMENT_NAME, NULL);
+    if (code_index < 0) {
+      err(ezcfg, "ezcfg_soap_add_body_child\n");
+      rc = -1;
+      goto exit;
+    }
 
     /* SOAP Fault Code value part */
     child_index = ezcfg_soap_add_body_child(soap, code_index, -1, EZCFG_SOAP_VALUE_ELEMENT_NAME, EZCFG_SOAP_VALUE_ELEMENT_VALUE);
+    if (child_index < 0) {
+      err(ezcfg, "ezcfg_soap_add_body_child\n");
+      rc = -1;
+      goto exit;
+    }
 
     /* SOAP Fault Reason part */
     reason_index = ezcfg_soap_add_body_child(soap, fault_index, -1, EZCFG_SOAP_REASON_ELEMENT_NAME, NULL);
+    if (reason_index < 0) {
+      err(ezcfg, "ezcfg_soap_add_body_child\n");
+      rc = -1;
+      goto exit;
+    }
 
     /* SOAP Fault Reason Text part */
     child_index = ezcfg_soap_add_body_child(soap, reason_index, -1, EZCFG_SOAP_TEXT_ELEMENT_NAME, EZCFG_SOAP_NVRAM_INVALID_NAME_FAULT_VALUE);
+    if (child_index < 0) {
+      err(ezcfg, "ezcfg_soap_add_body_child\n");
+      rc = -1;
+      goto exit;
+    }
 
     msg_len = ezcfg_soap_get_message_length(soap);
     if (msg_len < 0) {
@@ -669,6 +759,11 @@ static int build_nvram_set_multi_response(struct ezcfg_soap_http *sh, struct ezc
 
     /* Body child setMultiNvram part */
     setmnv_index = ezcfg_soap_add_body_child(soap, body_index, -1, EZCFG_SOAP_NVRAM_SETMNV_RESPONSE_ELEMENT_NAME, NULL);
+    if (setmnv_index < 0) {
+      err(ezcfg, "ezcfg_soap_add_body_child\n");
+      rc = -1;
+      goto exit;
+    }
     ezcfg_soap_add_body_child_attribute(soap, setmnv_index, EZCFG_SOAP_NVRAM_ATTR_NS_NAME, EZCFG_SOAP_NVRAM_ATTR_NS_VALUE, EZCFG_XML_ELEMENT_ATTRIBUTE_TAIL);
 
     /* nvram result part */
@@ -741,18 +836,43 @@ static int build_nvram_set_multi_response(struct ezcfg_soap_http *sh, struct ezc
 
     /* SOAP Fault part */
     fault_index = ezcfg_soap_add_body_child(soap, body_index, -1, EZCFG_SOAP_FAULT_ELEMENT_NAME, NULL);
+    if (fault_index < 0) {
+      err(ezcfg, "ezcfg_soap_add_body_child\n");
+      rc = -1;
+      goto exit;
+    }
 
     /* SOAP Fault Code part */
     code_index = ezcfg_soap_add_body_child(soap, fault_index, -1, EZCFG_SOAP_CODE_ELEMENT_NAME, NULL);
+    if (code_index < 0) {
+      err(ezcfg, "ezcfg_soap_add_body_child\n");
+      rc = -1;
+      goto exit;
+    }
 
     /* SOAP Fault Code value part */
     child_index = ezcfg_soap_add_body_child(soap, code_index, -1, EZCFG_SOAP_VALUE_ELEMENT_NAME, EZCFG_SOAP_VALUE_ELEMENT_VALUE);
+    if (child_index < 0) {
+      err(ezcfg, "ezcfg_soap_add_body_child\n");
+      rc = -1;
+      goto exit;
+    }
 
     /* SOAP Fault Reason part */
     reason_index = ezcfg_soap_add_body_child(soap, fault_index, -1, EZCFG_SOAP_REASON_ELEMENT_NAME, NULL);
+    if (reason_index < 0) {
+      err(ezcfg, "ezcfg_soap_add_body_child\n");
+      rc = -1;
+      goto exit;
+    }
 
     /* SOAP Fault Reason Text part */
     child_index = ezcfg_soap_add_body_child(soap, reason_index, -1, EZCFG_SOAP_TEXT_ELEMENT_NAME, EZCFG_SOAP_NVRAM_INVALID_VALUE_FAULT_VALUE);
+    if (child_index < 0) {
+      err(ezcfg, "ezcfg_soap_add_body_child\n");
+      rc = -1;
+      goto exit;
+    }
 
     msg_len = ezcfg_soap_get_message_length(soap);
     if (msg_len < 0) {
@@ -839,6 +959,11 @@ static int build_nvram_commit_response(struct ezcfg_soap_http *sh, struct ezcfg_
 
     /* Body child commitNvram part */
     commitnv_index = ezcfg_soap_add_body_child(soap, body_index, -1, EZCFG_SOAP_NVRAM_COMMITNV_RESPONSE_ELEMENT_NAME, NULL);
+    if (commitnv_index < 0) {
+      err(ezcfg, "ezcfg_soap_add_body_child\n");
+      rc = -1;
+      goto exit;
+    }
     ezcfg_soap_add_body_child_attribute(soap, commitnv_index, EZCFG_SOAP_NVRAM_ATTR_NS_NAME, EZCFG_SOAP_NVRAM_ATTR_NS_VALUE, EZCFG_XML_ELEMENT_ATTRIBUTE_TAIL);
 
     /* nvram result part */
@@ -911,18 +1036,43 @@ static int build_nvram_commit_response(struct ezcfg_soap_http *sh, struct ezcfg_
 
     /* SOAP Fault part */
     fault_index = ezcfg_soap_add_body_child(soap, body_index, -1, EZCFG_SOAP_FAULT_ELEMENT_NAME, NULL);
+    if (fault_index < 0) {
+      err(ezcfg, "ezcfg_soap_add_body_child\n");
+      rc = -1;
+      goto exit;
+    }
 
     /* SOAP Fault Code part */
     code_index = ezcfg_soap_add_body_child(soap, fault_index, -1, EZCFG_SOAP_CODE_ELEMENT_NAME, NULL);
+    if (code_index < 0) {
+      err(ezcfg, "ezcfg_soap_add_body_child\n");
+      rc = -1;
+      goto exit;
+    }
 
     /* SOAP Fault Code value part */
     child_index = ezcfg_soap_add_body_child(soap, code_index, -1, EZCFG_SOAP_VALUE_ELEMENT_NAME, EZCFG_SOAP_VALUE_ELEMENT_VALUE);
+    if (child_index < 0) {
+      err(ezcfg, "ezcfg_soap_add_body_child\n");
+      rc = -1;
+      goto exit;
+    }
 
     /* SOAP Fault Reason part */
     reason_index = ezcfg_soap_add_body_child(soap, fault_index, -1, EZCFG_SOAP_REASON_ELEMENT_NAME, NULL);
+    if (reason_index < 0) {
+      err(ezcfg, "ezcfg_soap_add_body_child\n");
+      rc = -1;
+      goto exit;
+    }
 
     /* SOAP Fault Reason Text part */
     child_index = ezcfg_soap_add_body_child(soap, reason_index, -1, EZCFG_SOAP_TEXT_ELEMENT_NAME, EZCFG_SOAP_NVRAM_OPERATION_FAIL_FAULT_VALUE);
+    if (child_index < 0) {
+      err(ezcfg, "ezcfg_soap_add_body_child\n");
+      rc = -1;
+      goto exit;
+    }
 
     msg_len = ezcfg_soap_get_message_length(soap);
     if (msg_len < 0) {

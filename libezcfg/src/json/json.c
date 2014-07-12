@@ -200,13 +200,13 @@ static bool json_value_is_native_value(struct ezcfg_json_value *vp)
 
 static bool json_value_set_element(struct ezcfg_json_value *vp, char *buf, int len)
 {
-  vp->element = strndup(buf, len);
+  vp->element = malloc(len+1);
   if (vp->element == NULL) {
     return false;
   }
-  else {
-    return true;
-  }
+  strncpy(vp->element, buf, len);
+  vp->element[len] = '\0';
+  return true;
 }
 
 static bool json_value_set_nvpair_string(struct ezcfg_json_value *vp, char *buf, int len)
