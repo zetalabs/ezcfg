@@ -42,6 +42,7 @@
 #include <termios.h>
 #include <sys/ioctl.h>
 #include <sys/reboot.h>
+#include <sys/resource.h>
 
 #include "ezcd.h"
 

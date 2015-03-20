@@ -5,7 +5,8 @@ AC_PREREQ([2.62])
 AC_INIT([ezcfg], [0.1], [ezbox@ezidc.net])
 AC_CANONICAL_SYSTEM
 m4_ifdef([AM_SILENT_RULES], [AM_SILENT_RULES([yes])])
-AM_INIT_AUTOMAKE([-Wall -Werror foreign])
+AM_INIT_AUTOMAKE([-Wall -Werror foreign subdir-objects])
+AM_PROG_AR
 
 #AC_DISABLE_STATIC
 AC_CONFIG_MACRO_DIR([m4])
