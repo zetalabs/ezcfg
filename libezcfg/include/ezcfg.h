@@ -26,18 +26,34 @@
 #ifdef EZCFG_DEBUG
 #include <assert.h>
 #define ASSERT(exp) assert(exp)   
+#define EZDBG(format, args...) \
+  do { \
+    FILE *ezdbg_fp = fopen("/tmp/ezdbg.log", "a");  \
+    if (ezdbg_fp) {                                 \
+      fprintf(ezdbg_fp, format, ## args);           \
+      fclose(ezdbg_fp);                             \
+    }                                               \
+  } while(0)
 #else
 #define ASSERT(exp) do {} while(0) 
+#define EZDBG(format, args...)
 #endif
 
 #define ARRAY_SIZE(x) (sizeof(x) / sizeof((x)[0]))
 
-#define EZBOX_PROJECT_HOME_PAGE_URI	"http://code.google.com/p/ezbox/"
+#define EZBOX_PROJECT_HOME_PAGE_URI	"https://github.com/zetalabs/ezbox/"
 
 #define EZCFG_INVALID_SOCKET      -1
 #define EZCFG_BUFFER_SIZE         8192
+#define EZCFG_NAME_MAX            128
+#define EZCFG_VALUE_MAX           128
 #define EZCFG_PATH_MAX            128
 #define EZCFG_LOCALE_MAX          32
+
+/* ezcfg manipulate limits */
+#define EZCFG_LOCK_RETRY_MAX            3
+#define EZCFG_UNLOCK_RETRY_MAX          3
+#define EZCFG_REF_COUNTER_RETRY_MAX     3
 
 #define EZCFG_CONFIG_FILE_PATH	SYSCONFDIR "/ezcfg.conf"
 #define EZCFG_NVRAM_CONFIG_FILE_PATH	SYSCONFDIR "/nvram.conf"
@@ -45,7 +61,7 @@
 
 /* function return value */
 #define EZCFG_RET_OK            0
-#define EZCFG_RET_BAD          -1
+#define EZCFG_RET_FAIL         -1
 
 /* minimum number of worker threads */
 /* nvram socket */
@@ -125,6 +141,11 @@
 #define EZCFG_COMMON_DEFAULT_RULES_PATH       SYSCONFDIR "/ezcfg.rules"
 #define EZCFG_COMMON_DEFAULT_LOCALE_STRING    "zh_CN.UTF-8"
 
+
+/* ezcfg file trailing charlist */
+#define EZCFG_EZCFG_TRAILING_CHARLIST       "\r\n\t "
+
+
 /* ezcfg nvram definitions */
 #define EZCFG_NVRAM_BUFFER_SIZE            0x10000 /* 64K Bytes */
 #define EZCFG_NVRAM_BUFFER_SIZE_STRING     "65536" /* 64K Bytes */
@@ -185,18 +206,19 @@
 #define EZCFG_SOCKET_TYPE_RAW_STRING       "raw"
 
 /* ezcfg supported protocols */
-#define EZCFG_PROTO_UNKNOWN	0
-#define EZCFG_PROTO_CTRL	1
-#define EZCFG_PROTO_HTTP	2
-#define EZCFG_PROTO_HTTPS	3
-#define EZCFG_PROTO_SOAP_HTTP	4
-#define EZCFG_PROTO_IGRS	5
-#define EZCFG_PROTO_IGRS_ISDP	6
-#define EZCFG_PROTO_UEVENT	7
-#define EZCFG_PROTO_UPNP_SSDP	8
-#define EZCFG_PROTO_UPNP_HTTP	9
-#define EZCFG_PROTO_UPNP_GENA	10
-#define EZCFG_PROTO_JSON_HTTP		11
+#define EZCFG_PROTO_UNKNOWN             0
+#define EZCFG_PROTO_CTRL                1
+#define EZCFG_PROTO_HTTP                2
+#define EZCFG_PROTO_HTTPS               3
+#define EZCFG_PROTO_SOAP_HTTP           4
+#define EZCFG_PROTO_IGRS                5
+#define EZCFG_PROTO_IGRS_ISDP           6
+#define EZCFG_PROTO_UEVENT              7
+#define EZCFG_PROTO_UPNP_SSDP           8
+#define EZCFG_PROTO_UPNP_HTTP           9
+#define EZCFG_PROTO_UPNP_GENA           10
+#define EZCFG_PROTO_JSON_HTTP           11
+#define EZCFG_PROTO_NV_JSON_HTTP        12
 
 //#define EZCFG_SOCKET_PROTO_UNKNOWN_STRING         "0"
 #define EZCFG_SOCKET_PROTO_CTRL_STRING            "ctrl"
@@ -210,6 +232,7 @@
 #define EZCFG_SOCKET_PROTO_UPNP_HTTP_STRING       "upnp-http"
 #define EZCFG_SOCKET_PROTO_UPNP_GENA_STRING       "upnp-gena"
 #define EZCFG_SOCKET_PROTO_JSON_HTTP_STRING       "json-http"
+#define EZCFG_SOCKET_PROTO_NV_JSON_HTTP_STRING    "nv-json-http"
 
 #define EZCFG_PROTO_HTTP_PORT_NUMBER              80
 #define EZCFG_PROTO_HTTP_PORT_NUMBER_STRING       "80"

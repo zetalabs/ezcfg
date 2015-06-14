@@ -16,9 +16,28 @@
 #ifndef _EZCFG_NVRAM_DEFAULTS_H_
 #define _EZCFG_NVRAM_DEFAULTS_H_
 
+
+#define GLUE2(a, b)      	a ## b
+#define GLUE3(a, b, c)   	a ## b ## c
+#define GLUE4(a, b, c, d)	a ## b ## c ## d
+
+#define NVRAM_PREFIX(prefix)      	GLUE2(EZCFG_NVRAM_PREFIX_, prefix)
+#define NVRAM_ENTITY(prefix, name)	GLUE4(EZCFG_NVRAM_, prefix, _, name)
+#define NVRAM_NAME(prefix, name) \
+  NVRAM_PREFIX(prefix) NVRAM_ENTITY(prefix, name)
+
+#define SERVICE_OPTION(service, name)	GLUE4(EZCFG_NVRAM_, service, _, name)
+
+#define NVRAM_SERVICE_OPTION(service, name) \
+  NVRAM_PREFIX(service) SERVICE_OPTION(service, name)
+
 #include "ezcfg-nvram_meta.h"
+#include "ezcfg-nvram_socket.h"
+#include "ezcfg-nvram_thread.h"
+#include "ezcfg-nvram_process.h"
+#include "ezcfg-nvram_sys.h"
+#if 0
 #include "ezcfg-env.h"
-#include "ezcfg-sys.h"
 #include "ezcfg-ezcfg.h"
 #include "ezcfg-loopback.h"
 #include "ezcfg-eth_lan.h"
@@ -51,19 +70,6 @@
 #include "ezcfg-pppoe_server.h"
 #include "ezcfg-rp_pppoe.h"
 #include "ezcfg-freeradius2_server.h"
-
-#define GLUE2(a, b)      	a ## b
-#define GLUE3(a, b, c)   	a ## b ## c
-#define GLUE4(a, b, c, d)	a ## b ## c ## d
-
-#define NVRAM_PREFIX(prefix)      	GLUE3(EZCFG_, prefix, _NVRAM_PREFIX)
-#define NVRAM_ENTITY(prefix, name)	GLUE4(EZCFG_, prefix, _, name)
-#define NVRAM_NAME(prefix, name) \
-  NVRAM_PREFIX(prefix) NVRAM_ENTITY(prefix, name)
-
-#define SERVICE_OPTION(service, name)	GLUE4(EZCFG_, service, _, name)
-
-#define NVRAM_SERVICE_OPTION(service, name) \
-  NVRAM_PREFIX(service) SERVICE_OPTION(service, name)
+#endif
 
 #endif

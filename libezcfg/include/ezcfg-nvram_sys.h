@@ -13,25 +13,25 @@
  * ============================================================================
  */
 
-#ifndef _EZCFG_SYS_H_
-#define _EZCFG_SYS_H_
+#ifndef _EZCFG_NVRAM_SYS_H_
+#define _EZCFG_NVRAM_SYS_H_
 
 /* ezcfg nvram name prefix */
-#define EZCFG_SYS_NVRAM_PREFIX        "sys."
+#define EZCFG_NVRAM_PREFIX_SYS                  "sys."
 
 /* ezcfg system names */
-#define EZCFG_SYS_DEVICE_NAME             "device_name"
-#define EZCFG_SYS_SERIAL_NUMBER           "serial_number"
-#define EZCFG_SYS_DISTRO_NAME             "distro_name"
-#define EZCFG_SYS_HARDWARE_ARCH           "hardware_arch"
-#define EZCFG_SYS_HARDWARE_VERSION        "hardware_version"
-#define EZCFG_SYS_SOFTWARE_VERSION        "software_version"
-#define EZCFG_SYS_SOFTWARE_REVISION       "software_revision"
+#define EZCFG_NVRAM_SYS_DEVICE_NAME             "device_name"
+#define EZCFG_NVRAM_SYS_SERIAL_NUMBER           "serial_number"
+#define EZCFG_NVRAM_SYS_DISTRO_NAME             "distro_name"
+#define EZCFG_NVRAM_SYS_HARDWARE_ARCH           "hardware_arch"
+#define EZCFG_NVRAM_SYS_HARDWARE_VERSION        "hardware_version"
+#define EZCFG_NVRAM_SYS_SOFTWARE_VERSION        "software_version"
+#define EZCFG_NVRAM_SYS_SOFTWARE_REVISION       "software_revision"
 
-#define EZCFG_SYS_HDD_DEVICE              "hdd_device"
-#define EZCFG_SYS_BOOT_ARGS               "boot_args"
+#define EZCFG_NVRAM_SYS_HDD_DEVICE              "hdd_device"
+#define EZCFG_NVRAM_SYS_BOOT_ARGS               "boot_args"
 
-#define EZCFG_SYS_UPGRADE_IMAGE           "upgrade_image"
+#define EZCFG_NVRAM_SYS_UPGRADE_IMAGE           "upgrade_image"
 
 #if 0
 #define EZCFG_SYS_LANGUAGE                "language"
@@ -53,11 +53,11 @@
 #define EZCFG_SYS_WAN_NIC                 "wan_nic"
 #endif
 
-#define EZCFG_SYS_DATA_DEV                "data_dev"
-#define EZCFG_SYS_DATA_DEV_KEY            "data_dev_key"
-#define EZCFG_SYS_SWAP_DEV                "swap_dev"
-#define EZCFG_SYS_MODULES                 "modules"
-#define EZCFG_SYS_IPTABLES_MODULES        "iptables_modules"
-#define EZCFG_SYS_LD_LIBRARY_PATH         "ld_library_path"
+#define EZCFG_NVRAM_SYS_DATA_DEV                "data_dev"
+#define EZCFG_NVRAM_SYS_DATA_DEV_KEY            "data_dev_key"
+#define EZCFG_NVRAM_SYS_SWAP_DEV                "swap_dev"
+#define EZCFG_NVRAM_SYS_MODULES                 "modules"
+#define EZCFG_NVRAM_SYS_IPTABLES_MODULES        "iptables_modules"
+#define EZCFG_NVRAM_SYS_LD_LIBRARY_PATH         "ld_library_path"
 
 #endif

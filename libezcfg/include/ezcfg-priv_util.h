@@ -128,7 +128,7 @@ int ezcfg_util_execute(char *const argv[], char *in_path, char *out_path, int ti
 
 /* util/util_rc.c */
 bool ezcfg_util_rc(char *func, char *act, int s);
-bool ezcfg_util_rc_list(ezcfg_rc_triple_t *list, char *func, char *act, int s);
+bool ezcfg_util_rc_list(struct ezcfg_rc_triple *list, char *func, char *act, int s);
 
 /* util/util_service_binding.c */
 int ezcfg_util_service_binding(char *interface);
@@ -138,5 +138,8 @@ bool ezcfg_util_if_get_ipaddr(const char ifname[IFNAMSIZ], char ip[INET_ADDRSTRL
 
 /* util/util_mkdir.c */
 int ezcfg_util_mkdir(const char *path, mode_t mode, bool is_dir);
+
+/* util/util_snprintf_ns_name.c */
+int ezcfg_util_snprintf_ns_name(char *buf, size_t size, char *ns, char *name);
 
 #endif /* _EZCFG_PRIV_UTIL_H_ */

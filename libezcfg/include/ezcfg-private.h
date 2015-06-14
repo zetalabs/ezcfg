@@ -32,28 +32,30 @@
 typedef void *(*ezcfg_thread_func_t)(void *);
 
 /* name-value pair struct */
-typedef struct ezcfg_nv_pair_s {
-  char *name;
-  char *value;
-} ezcfg_nv_pair_t;
+struct ezcfg_nv_pair {
+  char *n; /* null-terminated name string */
+  char *v; /* null-terminated value string */
+  int nlen; /* name string length including null */
+  int vlen; /* value string length including null */
+};
 
 /* rc service invocation struct */
-typedef struct ezcfg_rc_triple_s {
+struct ezcfg_rc_triple {
   char *service;
   char *action;
   int wait;
-} ezcfg_rc_triple_t;
+};
 
 /* args/arg_nvram_socket.c */
-typedef struct ezcfg_arg_nvram_socket {
+struct ezcfg_arg_nvram_socket {
   char *domain;
   char *type;
   char *protocol;
   char *address;
-} ezcfg_arg_nvram_socket_t;
+};
 
 /* args/arg_nvram_ssl.c */
-typedef struct ezcfg_arg_nvram_ssl {
+struct ezcfg_arg_nvram_ssl {
   char *role;
   char *method;
   char *socket_enable;
@@ -64,30 +66,64 @@ typedef struct ezcfg_arg_nvram_ssl {
   char *certificate_file;
   char *certificate_chain_file;
   char *private_key_file;
-} ezcfg_arg_nvram_ssl_t;
+};
 
+/*****************************/
+/* common part header files  */
+/*****************************/
 /* common/ezcfg.c */
 #include "ezcfg-priv_common.h"
 
-/* list/linked_list.c */
-#include "ezcfg-priv_linked_list.h"
+/*****************************/
+/* basic object header files */
+/*****************************/
+/* basic/nv_pair/nv_pair.c */
+#include "ezcfg-priv_basic_nv_pair.h"
 
-/* list/stack_list.c */
-#include "ezcfg-priv_stack_list.h"
+/* basic/linked_list/linked_list.c */
+#include "ezcfg-priv_basic_linked_list.h"
 
-/* tree/avl_tree.c */
-#include "ezcfg-priv_avl_tree.h"
+/* basic/stack_list/stack_list.c */
+#include "ezcfg-priv_basic_stack_list.h"
 
-/* tree/binary_tree.c */
-#include "ezcfg-priv_binary_tree.h"
+/* basic/binary_tree/binary_tree.c */
+#include "ezcfg-priv_basic_binary_tree.h"
 
-/* thread/thread.c */
-int ezcfg_thread_start(struct ezcfg *ezcfg, int stacksize,
-	pthread_t *thread_id, ezcfg_thread_func_t func, void *param);
+/* basic/nv_linked_list/nv_linked_list.c */
+#include "ezcfg-priv_basic_nv_linked_list.h"
+
+/* basic/socket/socket.c */
+#include "ezcfg-priv_basic_socket.h"
+
+/* basic/thread/thread.c */
+#include "ezcfg-priv_basic_thread.h"
+
+/* basic/process/process.c */
+#include "ezcfg-priv_basic_process.h"
+
+/* basic/auth/auth.c */
+#include "ezcfg-priv_basic_auth.h"
+
+/* basic/http/http.c */
+#include "ezcfg-priv_basic_http.h"
+
+/* basic/json/json.c */
+#include "ezcfg-priv_basic_json.h"
+
+/*********************************/
+/* composite object header files */
+/*********************************/
+/* composite/json_http/json_http.c */
+#include "ezcfg-priv_composite_json_http.h"
+
+/* composite/nv_json_http_socket/nv_json_http_socket.c */
+#include "ezcfg-priv_composite_nv_json_http_socket.h"
+
+
 
 
 /* nvram/nvram-defaults.c */
-extern ezcfg_nv_pair_t default_nvram_settings[];
+extern struct ezcfg_nv_pair default_nvram_settings[];
 extern char *default_nvram_savings[];
 int ezcfg_nvram_get_num_default_nvram_settings(void);
 int ezcfg_nvram_get_num_default_nvram_savings(void);
@@ -111,9 +147,6 @@ int ezcfg_nvram_get_num_default_nvram_propagators(void);
 #include "ezcfg-priv_args.h"
 
 
-/* auth/auth.c */
-#include "ezcfg-priv_auth.h"
-
 
 /* locale/locale.c */
 #include "ezcfg-priv_locale.h"
@@ -134,12 +167,6 @@ bool ezcfg_uuid_v1_enforce_multicast_mac(struct ezcfg_uuid *uuid);
 /* ezctp/ezctp.c */
 #include "ezcfg-priv_ezctp.h"
 
-
-/* socket/socket.c */
-#include "ezcfg-priv_socket.h"
-
-/* http/http.c */
-#include "ezcfg-priv_http.h"
 
 /* html/html.c */
 struct ezcfg_html;
@@ -363,28 +390,6 @@ int ezcfg_http_html_admin_cnc_latency_handler(struct ezcfg_http_html_admin *admi
 /* xml/xml.c */
 #include "ezcfg-priv_xml.h"
 
-/* json/json.c */
-#include "ezcfg-priv_json.h"
-
-/* json/json_http.c */
-struct ezcfg_json_http;
-void ezcfg_json_http_delete(struct ezcfg_json_http *jh);
-struct ezcfg_json_http *ezcfg_json_http_new(struct ezcfg *ezcfg);
-struct ezcfg_json *ezcfg_json_http_get_json(struct ezcfg_json_http *jh);
-struct ezcfg_http *ezcfg_json_http_get_http(struct ezcfg_json_http *jh);
-unsigned short ezcfg_json_http_get_http_version_major(struct ezcfg_json_http *jh);
-unsigned short ezcfg_json_http_get_http_version_minor(struct ezcfg_json_http *jh);
-bool ezcfg_json_http_set_http_version_major(struct ezcfg_json_http *jh, unsigned short major);
-bool ezcfg_json_http_set_http_version_minor(struct ezcfg_json_http *jh, unsigned short minor);
-char *ezcfg_json_http_get_http_header_value(struct ezcfg_json_http *jh, char *name);
-void ezcfg_json_http_reset_attributes(struct ezcfg_json_http *jh);
-bool ezcfg_json_http_parse_header(struct ezcfg_json_http *jh, char *buf, int len);
-bool ezcfg_json_http_parse_message_body(struct ezcfg_json_http *jh);
-char *ezcfg_json_http_set_message_body(struct ezcfg_json_http *jh, const char *body, int len);
-void ezcfg_json_http_dump(struct ezcfg_json_http *jh);
-int ezcfg_json_http_get_message_length(struct ezcfg_json_http *jh);
-int ezcfg_json_http_write_message(struct ezcfg_json_http *jh, char *buf, int len);
-
 /* soap/soap.c */
 struct ezcfg_soap;
 void ezcfg_soap_delete(struct ezcfg_soap *soap);
@@ -468,5 +473,13 @@ struct ezcfg_uevent *ezcfg_uevent_new(struct ezcfg *ezcfg);
 
 /* upnp/upnp.c */
 #include "ezcfg-priv_upnp.h"
+
+
+/*********************************************/
+/* following files are for complex structure */
+/*********************************************/
+
+/* http_socket/http_socket.c */
+#include "ezcfg-priv_http_socket.h"
 
 #endif /* _EZCFG_PRIVATE_H_ */

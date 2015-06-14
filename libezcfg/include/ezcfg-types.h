@@ -20,12 +20,56 @@
 #include <stdint.h>
 #include <stdbool.h>
 
-/*
- * common/ezcfg.c
- * ezbox config context
- */
+/*********************************/
+/* common part types             */
+/*********************************/
+/* common/ezcfg.c */
 struct ezcfg;
 
+/*********************************/
+/* basic object types            */
+/*********************************/
+/* basic/nv_pair/nv_pair.c */
+struct ezcfg_nv_pair;
+
+/* basic/linked_list/linked_list.c */
+struct ezcfg_linked_list;
+
+/* basic/stack_list/stack_list.c */
+struct ezcfg_stack_list;
+
+/* basic/binary_tree/binary_tree.c */
+struct ezcfg_binary_tree;
+
+/* basic/socket/socket.c */
+struct ezcfg_socket;
+
+/* basic/thread/thread.c */
+struct ezcfg_thread;
+
+/* basic/process/process.c */
+struct ezcfg_process;
+
+/* basic/auth/auth.c */
+struct ezcfg_auth;
+
+/* basic/http/http.c */
+struct ezcfg_http;
+
+/* json/json.c */
+struct ezcfg_json_value;
+struct ezcfg_json;
+
+
+/*********************************/
+/* composite object types        */
+/*********************************/
+
+
+
+/*********************************/
+/* FIXME: legacy object types    */
+/*********************************/
 /* tree/binary_tree.c */
 struct ezcfg_binary_tree_node;
 struct ezcfg_binary_tree;
@@ -73,16 +117,6 @@ struct ezcfg_ctrl;
 /* xml/xml.c */
 struct ezcfg_xml_element;
 struct ezcfg_xml;
-
-/* json/json.c */
-struct ezcfg_json_value;
-struct ezcfg_json;
-
-/* socket/socket.c */
-struct ezcfg_socket;
-
-/* http/http.c */
-struct ezcfg_http;
 
 /* nvram/nvram.c */
 struct ezcfg_nvram;

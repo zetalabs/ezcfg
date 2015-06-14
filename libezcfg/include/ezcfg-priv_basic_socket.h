@@ -1,6 +1,6 @@
 /* ============================================================================
  * Project Name : ezbox configuration utilities
- * File Name    : ezcfg-priv_socket.h
+ * File Name    : ezcfg-priv_basic_socket.h
  *
  * Description  : interface to configurate ezbox information
  *
@@ -8,18 +8,21 @@
  *
  * History      Rev       Description
  * 2011-12-14   0.1       Split it from ezcfg-private.h
+ * 2015-06-10   0.2       Rename it to ezcfg-priv_basic_socket.h
  * ============================================================================
  */
 
-#ifndef _EZCFG_PRIV_SOCKET_H_
-#define _EZCFG_PRIV_SOCKET_H_
+#ifndef _EZCFG_PRIV_BASIC_SOCKET_H_
+#define _EZCFG_PRIV_BASIC_SOCKET_H_
 
 #include "ezcfg-types.h"
 
-/* socket/socket.c */
-void ezcfg_socket_delete(struct ezcfg_socket *sp);
-struct ezcfg_socket *ezcfg_socket_new(struct ezcfg *ezcfg, const int family, const int type, const int proto, const char *socket_path);
-struct ezcfg_socket *ezcfg_socket_fake_new(struct ezcfg *ezcfg, const int family, const int type, const int proto, const char *socket_path);
+/* basic/socket/socket.c */
+int ezcfg_socket_del(struct ezcfg_socket *sp);
+struct ezcfg_socket *ezcfg_socket_new(struct ezcfg *ezcfg, char *ns);
+struct ezcfg_socket *ezcfg_socket_fake_new(struct ezcfg *ezcfg,
+  const int family, const int type, const int proto,
+  const char *laddr, const char *raddr);
 struct ezcfg_socket *ezcfg_socket_calloc(struct ezcfg *ezcfg, int size);
 struct ezcfg_socket *ezcfg_socket_new_accepted_socket(const struct ezcfg_socket *listener);
 void ezcfg_socket_close_sock(struct ezcfg_socket *sp);
@@ -64,7 +67,6 @@ void ezcfg_socket_set_need_delete(struct ezcfg_socket *sp, bool need_delete);
 bool ezcfg_socket_get_need_delete(struct ezcfg_socket *sp);
 bool ezcfg_socket_sync_lsa(struct ezcfg_socket *dsp, const struct ezcfg_socket *ssp);
 bool ezcfg_socket_sync_rsa(struct ezcfg_socket *dsp, const struct ezcfg_socket *ssp);
-int ezcfg_socket_set_remote(struct ezcfg_socket *sp, int domain, const char *socket_path);
 int ezcfg_socket_connect_remote(struct ezcfg_socket *sp);
 int ezcfg_socket_read(struct ezcfg_socket *sp, void *buf, int len, int flags);
 int ezcfg_socket_write(struct ezcfg_socket *sp, const void *buf, int len, int flags);
@@ -73,4 +75,4 @@ int ezcfg_socket_write(struct ezcfg_socket *sp, const void *buf, int len, int fl
 int ezcfg_socket_read_http_header(struct ezcfg_socket *sp, struct ezcfg_http *http, char *buf, int bufsiz, int *nread);
 int ezcfg_socket_read_http_content(struct ezcfg_socket *sp, struct ezcfg_http *http, char **pbuf, int header_len, int *bufsiz, int *nread);
 
-#endif /* _EZCFG_PRIV_SOCKET_H_ */
+#endif /* _EZCFG_PRIV_BASIC_SOCKET_H_ */

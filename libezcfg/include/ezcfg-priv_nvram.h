@@ -18,6 +18,7 @@
 
 #include "ezcfg-types.h"
 
+#if 0
 /* nvram/nvram.c */
 int ezcfg_nvram_delete(struct ezcfg_nvram *nvram);
 struct ezcfg_nvram *ezcfg_nvram_new(struct ezcfg *ezcfg);
@@ -36,8 +37,10 @@ int ezcfg_nvram_initialize(struct ezcfg_nvram *nvram);
 int ezcfg_nvram_match_entry(struct ezcfg_nvram *nvram, char *name1, char *name2);
 int ezcfg_nvram_match_entry_value(struct ezcfg_nvram *nvram, char *name, char *value);
 int ezcfg_nvram_is_valid_entry_value(struct ezcfg_nvram *nvram, char *name, char *value);
+int ezcfg_nvram_get_entries(struct ezcfg_nvram *nvram, struct ezcfg_linked_list *list);
 int ezcfg_nvram_set_entries(struct ezcfg_nvram *nvram, struct ezcfg_linked_list *list);
 int ezcfg_nvram_set_multi_entries(struct ezcfg_nvram *nvram, struct ezcfg_link_list *list);
 int ezcfg_nvram_unset_multi_entries(struct ezcfg_nvram *nvram, struct ezcfg_link_list *list);
+#endif
 
 #endif /* _EZCFG_PRIV_NVRAM_H_ */

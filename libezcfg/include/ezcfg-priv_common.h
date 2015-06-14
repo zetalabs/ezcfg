@@ -73,8 +73,10 @@ ezcfg_log_close(void)
 }
 
 
-struct ezcfg *ezcfg_new(char *path);
-int ezcfg_delete(struct ezcfg *ezcfg);
+struct ezcfg *ezcfg_new(char *text);
+int ezcfg_del(struct ezcfg *ezcfg);
+int ezcfg_inc_ref(struct ezcfg *ezcfg);
+int ezcfg_dec_ref(struct ezcfg *ezcfg);
 int
 ezcfg_common_set_log_func(struct ezcfg *ezcfg,
 			  int (*log_func)(struct ezcfg *ezcfg,
@@ -87,43 +89,12 @@ ezcfg_common_set_log_func(struct ezcfg *ezcfg,
 int ezcfg_common_get_log_file(struct ezcfg *ezcfg, char *buf, size_t size);
 int ezcfg_common_set_log_file(struct ezcfg *ezcfg, char *buf);
 int ezcfg_common_get_log_priority(struct ezcfg *ezcfg);
-int ezcfg_common_get_meta_nvram(struct ezcfg *ezcfg, const char *name, char *buf, size_t len);
+//int ezcfg_common_get_meta_nvram(struct ezcfg *ezcfg, const char *name, char *buf, size_t len);
+int ezcfg_common_get_nvram_entry_value(struct ezcfg *ezcfg, const char *name, char **pvalue);
+int ezcfg_common_get_nvram_entries(struct ezcfg *ezcfg, struct ezcfg_linked_list *list);
+int ezcfg_common_set_nvram_entries(struct ezcfg *ezcfg, struct ezcfg_linked_list *list);
+int ezcfg_common_get_nvram_entries_by_ns(struct ezcfg *ezcfg, char *ns, struct ezcfg_linked_list **plist);
 
-
-/*
- * commom/meta_nvram.c
- * meta_nvram
- *
- * access to meta_nvram
- */
-struct nvram_header {
-  char magic[4]; /* must be 'N','V','R','M' */
-  char version[4];
-  char coding[4];
-  char backend[4];
-  int32_t data_size;
-  int32_t data_used;
-  uint32_t data_crc;
-  uint32_t header_crc;
-};
-
-#define NVRAM_VERSOIN_MAJOR 0x00 /* version[0] */
-#define NVRAM_VERSOIN_MINOR 0x02 /* version[1] */
-#define NVRAM_VERSOIN_MICRO 0x00 /* version[2] */
-#define NVRAM_VERSOIN_REV   0x00 /* version[3] */ 
-
-int ezcfg_meta_nvram_delete(char *buffer);
-char *ezcfg_meta_nvram_new(int size);
-int ezcfg_meta_nvram_set_version(char *buffer, char version[4]);
-int ezcfg_meta_nvram_set_coding_type(char *buffer, char coding[4]);
-int ezcfg_meta_nvram_set_backend_type(char *buffer, char backend[4]);
-int ezcfg_meta_nvram_update_data_crc(char *buffer);
-int ezcfg_meta_nvram_update_header_crc(char *buffer);
-int ezcfg_meta_nvram_set_entry(char *buffer, const char *name, const char *value);
-int ezcfg_meta_nvram_unset_entry(char *buffer, const char *name);
-int ezcfg_meta_nvram_get_entry_value(char *buffer, const char *name, char **value);
-int ezcfg_meta_nvram_match_entry(char *buffer, const char *name1, const char *name2);
-int ezcfg_meta_nvram_match_entry_value(char *buffer, const char *name, char *value);
 
 /*
  * commom/list.c
@@ -131,6 +102,7 @@ int ezcfg_meta_nvram_match_entry_value(char *buffer, const char *name, char *val
  *
  * access to ezcfg generated lists
  */
+#if 0
 struct ezcfg_list_node {
 	struct ezcfg_list_node *next, *prev;
 };
@@ -161,7 +133,9 @@ struct ezcfg_list_entry *ezcfg_list_entry_get_next(struct ezcfg_list_entry *list
 struct ezcfg_list_entry *ezcfg_list_entry_get_by_name(struct ezcfg_list_entry *list_entry, const char *name);
 const char *ezcfg_list_entry_get_name(struct ezcfg_list_entry *list_entry);
 const char *ezcfg_list_entry_get_value(struct ezcfg_list_entry *list_entry);
+#endif
 
+#if 0
 /**
  * ezcfg_list_entry_foreach:
  * @list_entry: entry to store the current position
@@ -187,7 +161,9 @@ int ezcfg_link_list_get_length(struct ezcfg_link_list *list);
 char *ezcfg_link_list_get_node_name_by_index(struct ezcfg_link_list *list, int i);
 char *ezcfg_link_list_get_node_value_by_index(struct ezcfg_link_list *list, int i);
 char *ezcfg_link_list_get_node_value_by_name(struct ezcfg_link_list *list, char *name);
+#endif
 
+#if 0
 /* common/shm.c */
 struct ezcfg_shm;
 size_t ezcfg_shm_get_size(void);
@@ -222,6 +198,7 @@ void ezcfg_shm_set_ezctp_cq_free(struct ezcfg_shm *shm, size_t length);
 bool ezcfg_shm_insert_ezctp_market_data(struct ezcfg_shm *shm, const void *data, size_t n, size_t size);
 bool ezcfg_shm_remove_ezctp_market_data(struct ezcfg_shm *shm, void **data, size_t *n, size_t *size);
 bool ezcfg_shm_save_ezctp_market_data(struct ezcfg_shm *shm, FILE *fp, size_t size, int flag);
+#endif
 #endif
 
 #endif /* _EZCFG_PRIV_COMMON_H_ */
