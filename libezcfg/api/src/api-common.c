@@ -48,7 +48,8 @@
 #include "ezcfg-api.h"
 
 #if 1
-#define DBG(format, args...) do {\
+#define DBG(format, args...) \
+  do { \
     FILE *dbg_fp = fopen("/tmp/libezcfg-api-common.log", "a");	\
     if (dbg_fp) {						\
       fprintf(dbg_fp, format, ## args);				\
@@ -77,6 +78,7 @@ bool ezcfg_api_common_initialized(void)
  **/
 char *ezcfg_api_common_get_config_file(void)
 {
+  DBG("%s(%d) config_file=[%s]\n", __func__, __LINE__, config_file);
   return config_file;
 }
 
@@ -106,6 +108,63 @@ int ezcfg_api_common_set_config_file(const char *path)
 }
 
 /**
+ * ezcfg_api_common_get_config_file_content:
+ *
+ **/
+char *ezcfg_api_common_get_config_file_content(void)
+{
+  struct stat statbuf;
+  char *buf = NULL;
+  FILE *fp = NULL;
+  size_t read_size = -1;
+
+  DBG("%s(%d) config_file=[%s]\n", __func__, __LINE__, config_file);
+  if (stat(config_file, &statbuf) < 0) {
+    DBG("%s(%d) can't stat [%s]\n", __func__, __LINE__, config_file);
+    return NULL;
+  }
+
+  buf = malloc(statbuf.st_size+1);
+  if (buf == NULL) {
+    DBG("%s(%d) malloc [%lu] bytes error.\n", __func__, __LINE__, statbuf.st_size);
+    return NULL;
+  }
+
+  fp = fopen(config_file, "r");
+  if (fp == NULL) {
+    DBG("%s(%d) fopen [%s] bytes error.\n", __func__, __LINE__, config_file);
+    free(buf);
+    return NULL;
+  }
+
+  read_size = fread(buf, sizeof(char), statbuf.st_size, fp);
+  DBG("%s(%d) fread return [%ld] bytes.\n", __func__, __LINE__, read_size);
+  DBG("%s(%d) statbuf.st_size [%lu] bytes.\n", __func__, __LINE__, statbuf.st_size);
+  if ((statbuf.st_size ^ read_size) != 0) {
+    DBG("%s(%d) fread [%s] bytes error.\n", __func__, __LINE__, config_file);
+    free(buf);
+    buf = NULL;
+  }
+  else {
+    buf[statbuf.st_size] = '\0';
+    while (read_size > 0) {
+      read_size--;
+      if ((buf[read_size] == '\r') ||
+          (buf[read_size] == '\n') ||
+          (buf[read_size] == '\t') ||
+          (buf[read_size] == ' ')) {
+        buf[read_size] = '\0';
+      }
+      else {
+        break;
+      }
+    }
+  }
+  fclose(fp);
+  return buf;
+}
+
+/**
  * ezcfg_api_common_new:
  *
  **/
@@ -121,7 +180,7 @@ struct ezcfg *ezcfg_api_common_new(char *path)
  * ezcfg_api_common_delete:
  *
  **/
-void ezcfg_api_common_delete(struct ezcfg *ezcfg)
+void ezcfg_api_common_del(struct ezcfg *ezcfg)
 {
-  ezcfg_delete(ezcfg);
+  ezcfg_del(ezcfg);
 }

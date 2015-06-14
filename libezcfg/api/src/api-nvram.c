@@ -4,12 +4,13 @@
  * Project Name : ezcfg Application Programming Interface
  * Module Name  : api-nvram.c
  *
- * Description  : ezcfg API for nvram manipulate
+ * Description  : ezcfg API for nvram manipulate through JSON/HTTP representation
  *
- * Copyright (C) 2008-2013 by ezbox-project
+ * Copyright (C) 2008-2015 by ezbox-project
  *
  * History      Rev       Description
  * 2010-09-17   0.1       Write it from scratch
+ * 2015-06-07   0.2       Add ezcfg_api_nvram_change()
  * ============================================================================
  */
 
@@ -43,48 +44,50 @@
 
 #include "ezcfg.h"
 #include "ezcfg-private.h"
-#include "ezcfg-soap_http.h"
+#include "ezcfg-nv_json_http_socket.h"
 
 #include "ezcfg-api.h"
 
-#if 0
-#define DBG(format, args...) do {\
-    FILE *dbg_fp = fopen("/tmp/api-nvram.log", "a");	\
-    if (dbg_fp) {					\
-      fprintf(dbg_fp, format, ## args);			\
-      fclose(dbg_fp);					\
-    }							\
-  } while(0)
-#else
-#define DBG(format, args...)
-#endif
-
 static bool debug = false;
-
-#if 0
-static void
-log_fn(struct ezcfg *ezcfg, int priority,
-       const char *file, int line, const char *fn,
-       const char *format, va_list args)
+static int
+log_func(struct ezcfg *ezcfg,
+         int priority,
+         const char *file,
+         int line,
+         const char *func,
+         const char *format,
+         va_list args)
 {
-  if (debug) {
-    char buf[1024];
-    struct timeval tv;
-    struct timezone tz;
+  char log_file[EZCFG_PATH_MAX];
+  int ret;
 
-    vsnprintf(buf, sizeof(buf), format, args);
-    gettimeofday(&tv, &tz);
-    fprintf(stderr, "%llu.%06u [%u] %s(%d): %s",
-	    (unsigned long long) tv.tv_sec, (unsigned int) tv.tv_usec,
-	    (int) getpid(), fn, line, buf);
+  if (debug == false) {
+    return EZCFG_RET_OK;
   }
-#if 0
+
+  ret = ezcfg_common_get_log_file(ezcfg, log_file, sizeof(log_file));
+  if (ret == EZCFG_RET_FAIL) {
+    return EZCFG_RET_FAIL;
+  }
+
+  if (log_file[0] == '\0') {
+    fprintf(stderr, "libezcfg: %s(%d)@%s: ", file, line, func);
+    vfprintf(stderr, format, args);
+    return EZCFG_RET_OK;
+  }
   else {
-    vsyslog(priority, format, args);
+    FILE *fp = fopen(log_file, "a");
+    if (fp != NULL) {
+      fprintf(fp, "libezcfg: %s(%d)@%s: ", file, line, func);
+      vfprintf(fp, format, args);
+      fclose(fp);
+      return EZCFG_RET_OK;
+    }
+    else {
+      return EZCFG_RET_FAIL;
+    }
   }
-#endif
 }
-#endif
 
 /**
  * ezcfg_api_nvram_get:
@@ -125,7 +128,7 @@ int ezcfg_api_nvram_get(const char *name, char *value, size_t len)
   }
 
   ezcfg_log_init("nvram_get");
-  ezcfg_common_set_log_func(ezcfg, log_fn);
+  ezcfg_common_set_log_func(ezcfg, log_func);
 
   sh = ezcfg_soap_http_new(ezcfg);
   if (sh == NULL) {
@@ -302,7 +305,7 @@ int ezcfg_api_nvram_get(const char *name, char *value, size_t len)
   }
 
   if (ezcfg != NULL) {
-    ezcfg_delete(ezcfg);
+    ezcfg_del(ezcfg);
   }
 
   return rc;
@@ -349,7 +352,7 @@ int ezcfg_api_nvram_set(const char *name, const char *value)
   }
 
   ezcfg_log_init("nvram_set");
-  ezcfg_common_set_log_fn(ezcfg, log_fn);
+  ezcfg_common_set_log_func(ezcfg, log_func);
 
   sh = ezcfg_soap_http_new(ezcfg);
   if (sh == NULL) {
@@ -551,7 +554,7 @@ int ezcfg_api_nvram_set(const char *name, const char *value)
   }
 
   if (ezcfg != NULL) {
-    ezcfg_delete(ezcfg);
+    ezcfg_del(ezcfg);
   }
 
   return rc;
@@ -597,7 +600,7 @@ int ezcfg_api_nvram_unset(const char *name)
   }
 
   ezcfg_log_init("nvram_unset");
-  ezcfg_common_set_log_fn(ezcfg, log_fn);
+  ezcfg_common_set_log_func(ezcfg, log_func);
 
   sh = ezcfg_soap_http_new(ezcfg);
   if (sh == NULL) {
@@ -760,7 +763,7 @@ int ezcfg_api_nvram_unset(const char *name)
   }
 
   if (ezcfg != NULL) {
-    ezcfg_delete(ezcfg);
+    ezcfg_del(ezcfg);
   }
 
   return rc;
@@ -773,3 +776,206 @@ void ezcfg_api_nvram_set_debug(bool enable_debug)
 {
   debug = enable_debug;
 }
+
+/**
+ * ezcfg_api_nvram_change:
+ * @init: nvram name
+ * @nv_json: buffer stored nvram value
+ *
+ **/
+int ezcfg_api_nvram_change(char *init_conf, char *ns, char *nv_json, char **presult)
+{
+  char buf[1024];
+  char *msg = NULL;
+  int msg_len;
+  struct ezcfg *ezcfg = NULL;
+  struct ezcfg_json_http *jh = NULL;
+  struct ezcfg_http *http = NULL;
+  struct ezcfg_json *json = NULL;
+  struct ezcfg_socket *sp = NULL;
+  char *p;
+  int header_len;
+  int n;
+  int rc = 0;
+  int ret = EZCFG_RET_FAIL;
+
+  if ((init_conf == NULL) ||
+      (nv_json == NULL) ||
+      (presult == NULL)) {
+    return -EZCFG_E_ARGUMENT ;
+  }
+
+  ezcfg = ezcfg_new(init_conf);
+  if (ezcfg == NULL) {
+    rc = -EZCFG_E_RESOURCE ;
+    goto func_exit;
+  }
+
+  ezcfg_log_init("nvram_change");
+  ezcfg_common_set_log_func(ezcfg, log_func);
+
+  /* setup JSON/HTTP handler */
+  jh = ezcfg_json_http_new(ezcfg);
+  if (jh == NULL) {
+    rc = -EZCFG_E_RESOURCE ;
+    goto func_exit;
+  }
+
+  json = ezcfg_json_http_get_json(jh);
+  http = ezcfg_json_http_get_http(jh);
+
+  /* check nv_json format */
+  if (ezcfg_json_parse_text(json, nv_json, strlen(nv_json)) != EZCFG_RET_OK) {
+    rc = -EZCFG_E_RESOURCE ;
+    goto func_exit;
+  }
+
+  if (ezcfg_json_is_nvram_representation(json) == false) {
+    rc = -EZCFG_E_RESOURCE ;
+    goto func_exit;
+  }
+
+  /* build HTTP message body */
+  msg_len = ezcfg_json_get_msg_len(json);
+  /* add one more for '\0' */
+  msg = (char *)malloc(msg_len+1);
+  if (msg == NULL) {
+    rc = -EZCFG_E_SPACE ;
+    goto func_exit;
+  }
+  msg[msg_len] = '\0';
+
+  if (ezcfg_json_write_message(json, msg, msg_len) != msg_len) {
+    rc = -EZCFG_E_WRITE ;
+    goto func_exit;
+  }
+  ezcfg_http_set_message_body(http, msg, msg_len);
+
+  /* build HTTP request line */
+  ezcfg_http_set_request_method(http, EZCFG_HTTP_METHOD_POST);
+  snprintf(buf, sizeof(buf), "%s", EZCFG_NV_JSON_HTTP_URI);
+  ezcfg_http_set_request_uri(http, buf);
+  ezcfg_http_set_version_major(http, 1);
+  ezcfg_http_set_version_minor(http, 1);
+  ezcfg_http_set_state_request(http);
+
+  /* build HTTP headers */
+  snprintf(buf, sizeof(buf), "%s", "application/json");
+  ezcfg_http_add_header(http, EZCFG_HTTP_HEADER_ACCEPT, buf);
+  snprintf(buf, sizeof(buf), "%s", "application/json");
+  ezcfg_http_add_header(http, EZCFG_HTTP_HEADER_CONTENT_TYPE, buf);
+
+  msg_len = ezcfg_http_get_message_length(http);
+  /* add one more for '\0' */
+  p = (char *)realloc(msg, msg_len+1);
+  if (p == NULL) {
+    rc = -EZCFG_E_SPACE ;
+    goto func_exit;
+  }
+  msg = p;
+  msg[msg_len] = '\0';
+  if (ezcfg_json_http_write_message(jh, msg, msg_len) != msg_len) {
+    rc = -EZCFG_E_WRITE ;
+    goto func_exit;
+  }
+
+  /* build socket */
+  sp = ezcfg_socket_new(ezcfg, ns);
+  if (sp == NULL) {
+    EZDBG("%s(%d)\n", __func__, __LINE__);
+    err(ezcfg, "can not get a new ezcfg_socket");
+    rc = -EZCFG_E_RESOURCE ;
+    goto func_exit;
+  }
+
+  if (ezcfg_socket_enable_receiving(sp) < 0) {
+    err(ezcfg, "enable socket receiving fail: %m\n");
+    rc = -EZCFG_E_RESOURCE ;
+    goto func_exit;
+  }
+
+  if (ezcfg_socket_connect_remote(sp) < 0) {
+    rc = -EZCFG_E_CONNECTION ;
+    goto func_exit;
+  }
+
+  if (ezcfg_socket_write(sp, msg, msg_len, 0) < 0) {
+    rc = -EZCFG_E_WRITE ;
+    goto func_exit;
+  }
+
+  ezcfg_json_http_reset_attributes(jh);
+
+  n = 0;
+  header_len = ezcfg_socket_read_http_header(sp, http, msg, msg_len, &n);
+
+  if (header_len <= 0) {
+    rc = -EZCFG_E_READ ;
+    goto func_exit;
+  }
+
+  ezcfg_http_set_state_response(http);
+  if (ezcfg_json_http_parse_header(jh, msg, header_len) == false) {
+    rc = -EZCFG_E_PARSE ;
+    goto func_exit;
+  }
+
+  ret = ezcfg_socket_read_http_content(sp, http, &msg, header_len, &msg_len, &n);
+  if (ret != EZCFG_RET_OK) {
+    /* Do not put garbage in the access log */
+    rc = -EZCFG_E_READ ;
+    goto func_exit;
+  }
+  if (n > header_len) {
+    ezcfg_json_http_set_message_body(jh, msg + header_len, n - header_len);
+    if (ezcfg_json_http_parse_message_body(jh) == false) {
+      rc = -EZCFG_E_PARSE ;
+      goto func_exit;
+    }
+  }
+
+  json = ezcfg_json_http_get_json(jh);
+  if (ezcfg_json_is_nvram_representation(json) == false) {
+    rc = -EZCFG_E_PARSE ;
+    goto func_exit;
+  }
+
+  if (ezcfg_json_is_nvram_result_ok(json) == true) {
+    rc = 0;
+  }
+  else {
+    rc = -EZCFG_E_RESULT ;
+    msg_len = ezcfg_json_get_msg_len(json);
+    *presult = (char *)calloc(msg_len+1, sizeof(char));
+    if (*presult == NULL) {
+      rc = -EZCFG_E_RESOURCE ;
+      goto func_exit;
+    }
+    if (ezcfg_json_write_message(json, *presult, msg_len) != msg_len) {
+      rc = -EZCFG_E_WRITE ;
+      free(*presult);
+      *presult = NULL;
+      goto func_exit;
+    }
+  }
+
+func_exit:
+  if (msg != NULL) {
+    free(msg);
+  }
+
+  if (jh != NULL) {
+    ezcfg_json_http_del(jh);
+  }
+
+  if (sp != NULL) {
+    ezcfg_socket_del(sp);
+  }
+
+  if (ezcfg != NULL) {
+    ezcfg_del(ezcfg);
+  }
+
+  return rc;
+}
+

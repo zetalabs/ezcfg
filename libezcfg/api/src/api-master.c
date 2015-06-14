@@ -104,7 +104,7 @@ struct ezcfg_master *ezcfg_api_master_start(const char *name, int threads_max)
 		return NULL;
 	}
 
-	ezcfg_log_init(name);
+	ezcfg_log_init("master");
 	ezcfg_common_set_log_fn(ezcfg, log_fn);
 
 	master = ezcfg_master_start(ezcfg);

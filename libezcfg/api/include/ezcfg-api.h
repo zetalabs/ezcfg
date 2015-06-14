@@ -6,8 +6,9 @@ struct ezcfg;
 bool ezcfg_api_common_initialized(void);
 char *ezcfg_api_common_get_config_file(void);
 int ezcfg_api_common_set_config_file(const char *path);
+char *ezcfg_api_common_get_config_file_content(void);
 struct ezcfg *ezcfg_api_common_new(char *path);
-void ezcfg_api_common_delete(struct ezcfg *ezcfg);
+void ezcfg_api_common_del(struct ezcfg *ezcfg);
 char *ezcfg_api_common_get_root_path(struct ezcfg *ezcfg);
 char *ezcfg_api_common_get_sem_ezcfg_path(struct ezcfg *ezcfg);
 char *ezcfg_api_common_get_shm_ezcfg_path(struct ezcfg *ezcfg);
@@ -27,11 +28,12 @@ int ezcfg_api_util_get_conf_string(const char *path,
         char *buf, size_t len);
 
 /* Agent interface */
-struct ezcfg_agent;
-struct ezcfg_agent *ezcfg_api_agent_start(const char *name, int threads_max);
-int ezcfg_api_agent_stop(struct ezcfg_agent *agent);
-int ezcfg_api_agent_reload(struct ezcfg_agent *agent);
+int ezcfg_api_agent_start(char *init_conf);
+int ezcfg_api_agent_stop(char *init_conf);
+int ezcfg_api_agent_reload(char *init_conf);
+int ezcfg_api_agent_set_debug(char *init_conf, bool flag);
 
+#if 0
 /* Master thread interface */
 struct ezcfg_master;
 struct ezcfg_master *ezcfg_api_master_start(const char *name, int threads_max);
@@ -47,7 +49,7 @@ int ezcfg_api_ipc_get_ezcfg_shm_id(int *shm_id);
 /* function argument interface */
 struct ezcfg_arg_nvram_socket;
 struct ezcfg_arg_nvram_socket *ezcfg_api_arg_nvram_socket_new(void);
-int ezcfg_api_arg_nvram_socket_delete(struct ezcfg_arg_nvram_socket *ap);
+int ezcfg_api_arg_nvram_socket_del(struct ezcfg_arg_nvram_socket *ap);
 int ezcfg_api_arg_nvram_socket_get_domain(struct ezcfg_arg_nvram_socket *ap, char **pp);
 int ezcfg_api_arg_nvram_socket_set_domain(struct ezcfg_arg_nvram_socket *ap, const char *domain);
 int ezcfg_api_arg_nvram_socket_get_type(struct ezcfg_arg_nvram_socket *ap, char **pp);
@@ -59,7 +61,7 @@ int ezcfg_api_arg_nvram_socket_set_address(struct ezcfg_arg_nvram_socket *ap, co
 
 struct ezcfg_arg_nvram_ssl;
 struct ezcfg_arg_nvram_ssl *ezcfg_api_arg_nvram_ssl_new(void);
-int ezcfg_api_arg_nvram_ssl_delete(struct ezcfg_arg_nvram_ssl *ap);
+int ezcfg_api_arg_nvram_ssl_del(struct ezcfg_arg_nvram_ssl *ap);
 int ezcfg_api_arg_nvram_ssl_get_role(struct ezcfg_arg_nvram_ssl *ap, char **pp);
 int ezcfg_api_arg_nvram_ssl_set_role(struct ezcfg_arg_nvram_ssl *ap, const char *role);
 int ezcfg_api_arg_nvram_ssl_get_method(struct ezcfg_arg_nvram_ssl *ap, char **pp);
@@ -94,7 +96,11 @@ int ezcfg_api_nvram_insert_socket(struct ezcfg_arg_nvram_socket *ap);
 int ezcfg_api_nvram_remove_socket(struct ezcfg_arg_nvram_socket *ap);
 int ezcfg_api_nvram_insert_ssl(struct ezcfg_arg_nvram_ssl *ap);
 int ezcfg_api_nvram_remove_ssl(struct ezcfg_arg_nvram_ssl *ap);
+#endif
 
+int ezcfg_api_nvram_change(char *init_conf, char *ns, char *nv_json, char **presult);
+
+#if 0
 /* ezctp interface */
 #if (HAVE_EZBOX_SERVICE_EZCTP == 1)
 bool ezcfg_api_ezctp_require_semaphore(char *sem_ezcfg_path);
@@ -129,5 +135,6 @@ size_t ezcfg_api_ubootenv_size(void);
 
 /* firmware interface */
 int ezcfg_api_firmware_upgrade(char *name, char *model);
+#endif
 
 #endif

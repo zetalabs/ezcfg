@@ -30,20 +30,11 @@
 #include "ezcfg.h"
 #include "ezcfg-private.h"
 
-#if 0
-#define DBG(format, args...) do { \
-    char path[256];               \
-    FILE *fp;                                               \
-    snprintf(path, 256, "/tmp/%d-debug.txt", getpid());     \
-    fp = fopen(path, "a");                                  \
-    if (fp) {                                               \
-      fprintf(fp, format, ## args);                         \
-      fclose(fp);                                           \
-    }                                                       \
-  } while(0)
-#else
-#define DBG(format, args...)
-#endif
+#include "ezcfg_local.h"
+
+/* prototype for restricted functions */
+int _local_meta_nvram_set_entries(char *buffer, struct linked_list *list);
+int _local_meta_nvram_get_entries_by_ns(char *buffer, char *ns, struct ezcfg_linked_list *list);
 
 static unsigned char default_magic[4] = {'N','V','R','M'};
 
@@ -123,7 +114,7 @@ static int meta_nvram_set_entry(char *buffer, const char *name, const char *valu
   /* first entry */
   if (header->data_used == 0) {
     if (new_entry_len + 1 > (header->data_size - header->data_used)) {
-      return EZCFG_RET_BAD;
+      return EZCFG_RET_FAIL;
     }
     sprintf(data, "%s=%s", name, value);
     *(data + new_entry_len + 1) = '\0';
@@ -136,7 +127,7 @@ static int meta_nvram_set_entry(char *buffer, const char *name, const char *valu
     /* find nvram entry */
     entry_len = strlen(p) + 1;
     if (new_entry_len > (header->data_size - header->data_used + entry_len)) {
-      return EZCFG_RET_BAD;
+      return EZCFG_RET_FAIL;
     }
 
     if (entry_len >= new_entry_len) {
@@ -162,7 +153,7 @@ static int meta_nvram_set_entry(char *buffer, const char *name, const char *valu
   else {
     /* not find nvram entry */
     if (new_entry_len > (header->data_size - header->data_used)) {
-      return EZCFG_RET_BAD;
+      return EZCFG_RET_FAIL;
     }
     /* insert nvram entry */
     memmove(p + new_entry_len, p, header->data_used - (p - data));
@@ -197,7 +188,7 @@ static int meta_nvram_unset_entry(char *buffer, const char *name)
   }
   else {
     /* not find nvram entry */
-    ret = EZCFG_RET_BAD;
+    ret = EZCFG_RET_FAIL;
   }
 
   return ret;
@@ -209,7 +200,7 @@ static int meta_nvram_get_entry_value(char *buffer, const char *name, char **val
   //struct nvram_header *header;
   char *p, *data;
   int name_len;
-  bool equal;
+  bool equal = false;
 
   //header = (struct nvram_header *)buffer;
   data = buffer + sizeof(struct nvram_header);
@@ -219,14 +210,16 @@ static int meta_nvram_get_entry_value(char *buffer, const char *name, char **val
   /* find nvram entry position */
   p = find_nvram_entry_position(data, name, &equal);
 
-  if (equal == true) {
-    /* find nvram entry */
-    p += name_len;
-    while (*p == '=') { p++; };
-    *value = strdup(p);
-    if (*value == NULL) {
-      return EZCFG_RET_BAD;
-    }
+  if (equal == false) {
+    return EZCFG_RET_FAIL;
+  }
+
+  /* find nvram entry */
+  p += name_len;
+  while (*p == '=') { p++; };
+  *value = strdup(p);
+  if (*value == NULL) {
+    return EZCFG_RET_FAIL;
   }
   return EZCFG_RET_OK;
 }
@@ -247,7 +240,7 @@ static int meta_nvram_match_entry(char *buffer, const char *name1, const char *n
   p1 = find_nvram_entry_position(data, name1, &equal1);
 
   if (equal1 == false) {
-    return EZCFG_RET_BAD;
+    return EZCFG_RET_FAIL;
   }
   /* find nvram entry */
   p1 += name_len;
@@ -258,7 +251,7 @@ static int meta_nvram_match_entry(char *buffer, const char *name1, const char *n
   p2 = find_nvram_entry_position(data, name2, &equal2);
 
   if (equal2 == false) {
-    return EZCFG_RET_BAD;
+    return EZCFG_RET_FAIL;
   }
   /* find nvram entry */
   p2 += name_len;
@@ -267,7 +260,7 @@ static int meta_nvram_match_entry(char *buffer, const char *name1, const char *n
   if (strcmp(p1, p2) == 0)
     return EZCFG_RET_OK;
   else
-    return EZCFG_RET_BAD;
+    return EZCFG_RET_FAIL;
 }
 
 static int meta_nvram_match_entry_value(char *buffer, const char *name, char *value)
@@ -286,7 +279,7 @@ static int meta_nvram_match_entry_value(char *buffer, const char *name, char *va
   p = find_nvram_entry_position(data, name, &equal);
 
   if (*p == '\0') {
-    return EZCFG_RET_BAD;
+    return EZCFG_RET_FAIL;
   }
   /* find nvram entry */
   p += name_len;
@@ -295,14 +288,130 @@ static int meta_nvram_match_entry_value(char *buffer, const char *name, char *va
   if (strcmp(p, value) == 0)
     return EZCFG_RET_OK;
   else
-    return EZCFG_RET_BAD;
+    return EZCFG_RET_FAIL;
+}
+
+/*
+ * Restricted functions
+ */
+int _local_meta_nvram_set_entries(char *buffer, struct linked_list *list)
+{
+  int ret = EZCFG_RET_FAIL;
+  struct nv_pair *data;
+  int i, list_length;
+
+  ASSERT(buffer != NULL);
+  ASSERT(list != NULL);
+
+  /* parse settings */
+  list_length = local_linked_list_get_length(list);
+  for (i = 1; i < list_length+1; i++) {
+    data = (struct nv_pair *)local_linked_list_get_node_data_by_index(list, i);
+    if (data == NULL) {
+      ret = EZCFG_RET_FAIL;
+      goto func_out;
+    }
+    ret = meta_nvram_set_entry(buffer, data->name, data->value);
+    if (ret == EZCFG_RET_FAIL) {
+      goto func_out;
+    }
+  }
+
+ func_out:
+  return ret;
+}
+
+int _local_meta_nvram_get_entries_by_ns(char *buffer, char *ns, struct ezcfg_linked_list *list)
+{
+  struct ezcfg_nv_pair *data = NULL;
+  int ret = EZCFG_RET_FAIL;
+  char *p = NULL, *q = NULL;
+  int ns_len = 0;
+  char *name = NULL;
+  char *value = NULL;
+  int len = 0;
+
+  ASSERT(buffer != NULL);
+  ASSERT(list != NULL);
+
+  if (ns)
+    ns_len = strlen(ns);
+
+  p = buffer + sizeof(struct nvram_header);
+  while ((*p != '\0') || (*(p+1) != '\0')) {
+    /* name */
+    q = p;
+    while ((*q != '=') && (*q != '\0')) q++;
+    if (*q != '=') {
+      return EZCFG_RET_FAIL;
+    }
+    len = q - p;
+
+    if (ns != NULL) {
+      if (len < ns_len)
+        continue;
+      if (strncmp(p, ns, ns_len) != 0)
+        continue;
+    }
+
+    name = malloc(len + 1);
+    if (name == NULL)
+      goto exit_fail;
+    if (len > 0)
+      memcpy(name, p, len);
+    name[len] = '\0';
+
+    /* value */
+    while ((*q == '=') && (*q != '\0')) q++;
+    if (*q != '\0') p = q;
+    while(*q != '\0') q++;
+    len = q - p;
+    value = malloc(len + 1);
+    if (value == NULL)
+      goto exit_fail;
+    if (len > 0)
+      memcpy(value, p, len);
+    value[len] = '\0';
+
+    data = ezcfg_nv_pair_new(name, value);
+    if (data == NULL) {
+      goto exit_fail;
+    }
+    free(name);
+    name = NULL;
+    free(value);
+    value = NULL;
+    
+    ret = ezcfg_linked_list_append(list, data);
+    if (ret != EZCFG_RET_OK) {
+      goto exit_fail;
+    }
+    data = NULL;
+  }
+
+  return EZCFG_RET_OK;
+
+exit_fail:
+  if (name)
+    free(name);
+
+  if (value)
+    free(value);
+
+  if (data) {
+    if (data->n)
+      free(data->n);
+    if (data->v)
+      free(data->v);
+  }
+
+  return EZCFG_RET_FAIL;
 }
 
 /*
  * Public functions
  */
-
-int ezcfg_meta_nvram_delete(char *buffer)
+int local_meta_nvram_del(char *buffer)
 {
   ASSERT(buffer != NULL);
 
@@ -310,7 +419,7 @@ int ezcfg_meta_nvram_delete(char *buffer)
   return true;
 }
 
-char *ezcfg_meta_nvram_new(int size)
+char *local_meta_nvram_new(int size)
 {
   char *buffer;
   struct nvram_header *header;
@@ -318,7 +427,7 @@ char *ezcfg_meta_nvram_new(int size)
   int i;
 
   /* must have the space for header and two '\0' */
-  ASSERT(size > (int)(sizeof(struct nvram_header) + 2));
+  ASSERT(size >= (int)(sizeof(struct nvram_header) + 2));
 
   buffer = malloc(size);
   if (buffer == NULL) {
@@ -356,7 +465,7 @@ char *ezcfg_meta_nvram_new(int size)
   return buffer;
 }
 
-int ezcfg_meta_nvram_set_version(char *buffer, char version[4])
+int local_meta_nvram_set_version(char *buffer, char version[4])
 {
   struct nvram_header *header;
   int i;
@@ -373,7 +482,7 @@ int ezcfg_meta_nvram_set_version(char *buffer, char version[4])
   return true;
 }
 
-int ezcfg_meta_nvram_set_coding_type(char *buffer, char coding[4])
+int local_meta_nvram_set_coding_type(char *buffer, char coding[4])
 {
   struct nvram_header *header;
   int i;
@@ -390,7 +499,7 @@ int ezcfg_meta_nvram_set_coding_type(char *buffer, char coding[4])
   return true;
 }
 
-int ezcfg_meta_nvram_set_backend_type(char *buffer, char backend[4])
+int local_meta_nvram_set_backend_type(char *buffer, char backend[4])
 {
   struct nvram_header *header;
   int32_t i;
@@ -407,7 +516,7 @@ int ezcfg_meta_nvram_set_backend_type(char *buffer, char backend[4])
   return true;
 }
 
-int ezcfg_meta_nvram_update_data_crc(char *buffer)
+int local_meta_nvram_update_data_crc(char *buffer)
 {
   struct nvram_header *header;
   char *data;
@@ -421,7 +530,7 @@ int ezcfg_meta_nvram_update_data_crc(char *buffer)
   return EZCFG_RET_OK;
 }
 
-int ezcfg_meta_nvram_update_header_crc(char *buffer)
+int local_meta_nvram_update_header_crc(char *buffer)
 {
   struct nvram_header *header;
 
@@ -433,9 +542,9 @@ int ezcfg_meta_nvram_update_header_crc(char *buffer)
   return EZCFG_RET_OK;
 }
 
-int ezcfg_meta_nvram_set_entry(char *buffer, const char *name, const char *value)
+int local_meta_nvram_set_entry(char *buffer, const char *name, const char *value)
 {
-  int ret = EZCFG_RET_BAD;
+  int ret = EZCFG_RET_FAIL;
 
   ASSERT(buffer != NULL);
   ASSERT(name != NULL);
@@ -446,9 +555,9 @@ int ezcfg_meta_nvram_set_entry(char *buffer, const char *name, const char *value
   return ret;
 }
 
-int ezcfg_meta_nvram_unset_entry(char *buffer, const char *name)
+int local_meta_nvram_unset_entry(char *buffer, const char *name)
 {
-  int ret = EZCFG_RET_BAD;
+  int ret = EZCFG_RET_FAIL;
 
   ASSERT(buffer != NULL);
   ASSERT(name != NULL);
@@ -459,9 +568,9 @@ int ezcfg_meta_nvram_unset_entry(char *buffer, const char *name)
 }
 
 /* It's user's duty to free the returns string */
-int ezcfg_meta_nvram_get_entry_value(char *buffer, const char *name, char **value)
+int local_meta_nvram_get_entry_value(char *buffer, const char *name, char **value)
 {
-  int ret = EZCFG_RET_BAD;
+  int ret = EZCFG_RET_FAIL;
 
   ASSERT(buffer != NULL);
   ASSERT(name != NULL);
@@ -472,9 +581,9 @@ int ezcfg_meta_nvram_get_entry_value(char *buffer, const char *name, char **valu
   return ret;
 }
 
-int ezcfg_meta_nvram_match_entry(char *buffer, const char *name1, const char *name2)
+int local_meta_nvram_match_entry(char *buffer, const char *name1, const char *name2)
 {
-  int ret = EZCFG_RET_BAD;
+  int ret = EZCFG_RET_FAIL;
 
   ASSERT(buffer != NULL);
   ASSERT(name1 != NULL);
@@ -485,9 +594,9 @@ int ezcfg_meta_nvram_match_entry(char *buffer, const char *name1, const char *na
   return ret;
 }
 
-int ezcfg_meta_nvram_match_entry_value(char *buffer, const char *name, char *value)
+int local_meta_nvram_match_entry_value(char *buffer, const char *name, char *value)
 {
-  int ret = EZCFG_RET_BAD;
+  int ret = EZCFG_RET_FAIL;
 
   ASSERT(buffer != NULL);
   ASSERT(name != NULL);

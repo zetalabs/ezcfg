@@ -6,10 +6,11 @@
  *
  * Description  : ezcfg API for ezcfg agent manipulate
  *
- * Copyright (C) 2008-2013 by ezbox-project
+ * Copyright (C) 2008-2015 by ezbox-project
  *
  * History      Rev       Description
  * 2013-08-01   0.1       Modify it from api-master.c
+ * 2015-06-14   0.2       Reimplement it based on new process/thread objects.
  * ============================================================================
  */
 
@@ -43,21 +44,8 @@
 
 #include "ezcfg.h"
 #include "ezcfg-private.h"
-#include "ezcfg-soap_http.h"
 
 #include "ezcfg-api.h"
-
-#if 0
-#define DBG(format, args...) do {\
-    FILE *dbg_fp = fopen("/dev/kmsg", "a");	\
-    if (dbg_fp) {				  \
-      fprintf(dbg_fp, format, ## args);		  \
-      fclose(dbg_fp);				  \
-    }						  \
-  } while(0)
-#else
-#define DBG(format, args...)
-#endif
 
 static bool debug = false;
 static int
@@ -77,8 +65,8 @@ log_func(struct ezcfg *ezcfg,
   }
 
   ret = ezcfg_common_get_log_file(ezcfg, log_file, sizeof(log_file));
-  if (ret == EZCFG_RET_BAD) {
-    return EZCFG_RET_BAD;
+  if (ret == EZCFG_RET_FAIL) {
+    return EZCFG_RET_FAIL;
   }
 
   if (log_file[0] == '\0') {
@@ -95,64 +83,114 @@ log_func(struct ezcfg *ezcfg,
       return EZCFG_RET_OK;
     }
     else {
-      return EZCFG_RET_BAD;
+      return EZCFG_RET_FAIL;
     }
   }
 }
 
 /**
  * ezcfg_api_agent_start:
- * @argv: nvram name
- * @value: buffer to store nvram value
- * @len: buffer size
+ * @init_conf: ezcfg init configuration
+ * @threads_max: max number of threads
  *
  **/
-struct ezcfg_agent *ezcfg_api_agent_start(const char *name, int threads_max)
+int ezcfg_api_agent_start(char *init_conf)
 {
   struct ezcfg *ezcfg = NULL;
-  struct ezcfg_agent *agent = NULL;
+  struct ezcfg_socket_agent *agent = NULL;
+  int rc = 0;
+  int ret = EZCFG_RET_FAIL;
+  char *val = NULL;
 
-  if (name == NULL || threads_max < EZCFG_THREAD_MIN_NUM) {
-    //return -EZCFG_E_ARGUMENT ;
-    return NULL;
+  if (init_conf == NULL) {
+    EZDBG("%s(%d)\n", __func__, __LINE__);
+    return -EZCFG_E_ARGUMENT ;
   }
 
-  ezcfg = ezcfg_new(ezcfg_api_common_get_config_file());
+  EZDBG("%s(%d)\n", __func__, __LINE__);
+  ezcfg = ezcfg_new(init_conf);
   if (ezcfg == NULL) {
-    //return -EZCFG_E_RESOURCE ;
-    return NULL;
+    EZDBG("%s(%d)\n", __func__, __LINE__);
+    rc = -EZCFG_E_RESOURCE ;
+    goto func_out;
   }
 
-  ezcfg_log_init(name);
-  ezcfg_common_set_log_func(ezcfg, log_func);
+  EZDBG("%s(%d)\n", __func__, __LINE__);
+  ret = ezcfg_common_get_nvram_entry_value(ezcfg, NVRAM_NAME(AGENT, NAME), &val);
+  if (ret != EZCFG_RET_OK) {
+    EZDBG("%s(%d)\n", __func__, __LINE__);
+    rc = -EZCFG_E_ARGUMENT ;
+    goto func_out;
+  }
+  if (val) {
+    ezcfg_log_init(val);
+    ezcfg_common_set_log_func(ezcfg, log_func);
+    free(val);
+    val = NULL;
+  }
 
-  agent = ezcfg_agent_start(ezcfg);
+  EZDBG("%s(%d)\n", __func__, __LINE__);
+  ret = ezcfg_common_get_nvram_entry_value(ezcfg, NVRAM_NAME(AGENT, NAMESPACE), &val);
+  if (ret != EZCFG_RET_OK) {
+    EZDBG("%s(%d)\n", __func__, __LINE__);
+    rc = -EZCFG_E_ARGUMENT ;
+    goto func_out;
+  }
+  agent = ezcfg_socket_agent_new(ezcfg, val);
+  if (val) {
+    free(val);
+    val = NULL;
+  }
   if (agent == NULL) {
-    ezcfg_delete(ezcfg);
-    return NULL;
+    EZDBG("%s(%d)\n", __func__, __LINE__);
+    rc = -EZCFG_E_RESOURCE ;
+    goto func_out;
+  }
+  EZDBG("%s(%d)\n", __func__, __LINE__);
+
+  if (EZCFG_RET_OK == ezcfg_socket_agent_start(agent)) {
+    rc = 0;
+  }
+  else {
+    ezcfg_socket_agent_stop(agent);
+    rc = -EZCFG_E_RESOURCE ;
   }
 
-  ezcfg_agent_set_threads_max(agent, threads_max);
+func_out:
+  if (agent)
+    ezcfg_socket_agent_del(agent);
 
-  return agent;
+  if (ezcfg)
+    ezcfg_del(ezcfg);
+
+  return rc;
 }
 
-int ezcfg_api_agent_stop(struct ezcfg_agent *agent)
+int ezcfg_api_agent_stop(char *init_conf, char *ns)
 {
-  if (agent == NULL) {
+  if (init_conf == NULL) {
     return -EZCFG_E_ARGUMENT ;
   }
 
-  ezcfg_agent_stop(agent);
   return 0;
 }
 
-int ezcfg_api_agent_reload(struct ezcfg_agent *agent)
+int ezcfg_api_agent_reload(char *init_conf, char *ns)
 {
-  if (agent == NULL) {
+  if (init_conf == NULL) {
     return -EZCFG_E_ARGUMENT ;
   }
 
-  ezcfg_agent_reload(agent);
   return 0;
 }
+
+int ezcfg_api_agent_set_debug(char *init_conf, char *ns, bool flag)
+{
+  if (init_conf == NULL) {
+    return -EZCFG_E_ARGUMENT ;
+  }
+
+  debug = flag;
+  return 0;
+}
+

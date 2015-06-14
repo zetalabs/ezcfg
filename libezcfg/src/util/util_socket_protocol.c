@@ -50,6 +50,7 @@ static struct proto_pair ezcfg_support_protocols[] = {
 	{ EZCFG_PROTO_UPNP_GENA, EZCFG_SOCKET_PROTO_UPNP_GENA_STRING },
 #endif
 	{ EZCFG_PROTO_JSON_HTTP, EZCFG_SOCKET_PROTO_JSON_HTTP_STRING },
+	{ EZCFG_PROTO_NV_JSON_HTTP, EZCFG_SOCKET_PROTO_NV_JSON_HTTP_STRING },
 };
 
 int ezcfg_util_socket_protocol_get_index(char *name)
