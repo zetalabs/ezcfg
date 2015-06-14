@@ -10,6 +10,7 @@
  *
  * History      Rev       Description
  * 2013-07-18   0.1       Write it from scratch
+ * 2015-06-14   0.2       Reimplement it by using socket_agent object
  * ============================================================================
  */
 
@@ -43,30 +44,41 @@
 #include <sys/ioctl.h>
 #include <sys/reboot.h>
 #include <sys/resource.h>
+#include <stdarg.h>
 
 #include "ezcd.h"
 
 #define handle_error_en(en, msg) \
   do { errno = en; perror(msg); exit(EXIT_FAILURE); } while (0)
 
-#if 0
-#define DBG(format, args...) do {		  \
-    FILE *dbg_fp = fopen("/dev/kmsg", "a");	  \
-    if (dbg_fp) {				  \
-      fprintf(dbg_fp, format, ## args);		  \
-      fclose(dbg_fp);				  \
-    }						  \
+#if 1
+#define DBG(format, args...)                      \
+  do {                                            \
+    FILE *dbg_fp;                                 \
+    if (debug == true)                            \
+      dbg_fp = fopen("/tmp/kmsg", "a");           \
+    else                                          \
+      dbg_fp = fopen("/dev/kmsg", "a");	          \
+    if (dbg_fp) {                                 \
+      fprintf(dbg_fp, format, ## args);           \
+      fclose(dbg_fp);                             \
+    }                                             \
   } while(0)
 #else
 #define DBG(format, args...)
 #endif
 
-#define INFO(format, args...) do {		   \
-    FILE *info_fp = fopen("/dev/kmsg", "a");	   \
-    if (info_fp) {				   \
-      fprintf(info_fp, format, ## args);	   \
-      fclose(info_fp);				   \
-    }						   \
+#define INFO(format, args...)                     \
+  do {                                            \
+    FILE *info_fp;                                \
+    if (debug == true)                            \
+      info_fp = fopen("/tmp/kmsg", "a");          \
+    else                                          \
+      info_fp = fopen("/dev/kmsg", "a");          \
+    if (info_fp) {                                \
+      fprintf(info_fp, format, ## args);          \
+      fclose(info_fp);                            \
+    }                                             \
   } while(0)
 
 
@@ -80,154 +92,79 @@
 #  define RB_AUTOBOOT     0x01234567
 #endif
 
-//static bool debug = false;
-static int rc = EXIT_FAILURE;
-static unsigned int rb = RB_HALT_SYSTEM;
-static pthread_t root_thread;
-static struct ezcfg_agent *agent = NULL;
-
-static void *sig_thread_routine(void *arg)
+static void agent_env_show_usage(char *name)
 {
-  sigset_t *set = (sigset_t *) arg;
-  int s, sig;
-
-  for (;;) {
-    s = sigwait(set, &sig);
-    if (s != 0) {
-      DBG("<6>agent_env: sigwait errno = [%d]\n", s);
-      continue;
-    }
-    DBG("<6>agent_env: Signal handling thread got signal %d\n", sig);
-    switch(sig) {
-    case SIGTERM :
-    case SIGUSR2 :
-      ezcfg_api_agent_stop(agent);
-      rc = EXIT_SUCCESS;
-      if (sig == SIGTERM)
-	rb = RB_AUTOBOOT;
-      else
-	rb = RB_POWER_OFF;
-      return NULL;
-    case SIGUSR1 :
-      ezcfg_api_agent_reload(agent);
-      break;
-    case SIGCHLD :
-      /* do nothing for child exit */
-      break;
-    default :
-      DBG("<6>agent_env: unknown signal [%d]\n", sig);
-      break;
-    }
-  }
-
-  return NULL;
+  printf("Usage: %s [-c config file]\n", name);
+  printf("          [-i init config]\n");
+  printf("          [-n namespace]\n");
+  printf("\n");
+  printf("  [-c]--\n");
+  printf("    config file, default : \"%s\n", AGENT_ENV_CONFIG_FILE_PATH);
+  printf("  [-i]--\n");
+  printf("    init config by NVRAM JSON representation, ex: \"{\"name\":\"value\"}\"\n");
+  printf("  [-n]--\n");
+  printf("    namespace\n");
+  printf("\n");
 }
 
-static void init_reap(int sig)
-{
-  pid_t pid;
-  while ((pid = waitpid(-1, NULL, WNOHANG)) > 0) {
-    DBG("<6>agent_env: reaped %d\n", pid);
-  }
-}
-
-static void init_halt_reboot_poweroff(int sig)
-{
-  char *p;
-  void *handle;
-  union {
-    rc_function_t func;
-    void * obj;
-  } alias;
-  char *stop_argv[] = { "agent", "env", "stop", NULL };
-  sigset_t set;
-
-  /* reset signal handlers */
-  signal(SIGUSR1, SIG_DFL);
-  signal(SIGTERM, SIG_DFL);
-  signal(SIGUSR2, SIG_DFL);
-  sigfillset(&set);
-  sigprocmask(SIG_UNBLOCK, &set, NULL);
-
-  /* run agent environment stop processes */
-  handle = dlopen("/lib/rcso/rc_agent.so", RTLD_NOW);
-  if (handle == NULL) {
-    DBG("<6>agent_env: dlopen(%s) error %s\n", "/lib/rcso/rc_agent.so", dlerror());
-    return;
-  }
-
-  /* clear any existing error */
-  dlerror();
-
-  alias.obj = dlsym(handle, "rc_agent");
-
-  if ((p = dlerror()) != NULL)  {
-    DBG("<6>agent_env: dlsym error %s\n", p);
-    dlclose(handle);
-    return;
-  }
-
-  alias.func(ARRAY_SIZE(stop_argv) - 1, stop_argv);
-
-  /* close loader handle */
-  dlclose(handle);
-
-  /* send signals to every process _except_ pid 1 */
-  kill(-1, SIGTERM);
-  sync();
-  sleep(1);
-
-  kill(-1, SIGKILL);
-  sync();
-  sleep(1);
-
-  p = "halt";
-  rb = RB_HALT_SYSTEM;
-  if (sig == SIGTERM) {
-    p = "reboot";
-    rb = RB_AUTOBOOT;
-  } else if (sig == SIGUSR2) {
-    p = "poweroff";
-    rb = RB_POWER_OFF;
-  }
-
-  if (p != NULL) {
-    DBG("<6>agent_env: Requesting system %s", p);
-  }
-
-  if (fork() == 0) { /* child */
-    reboot(rb);
-    _exit(EXIT_SUCCESS);
-  }
-  while (1)
-    sleep(1);
-
-  /* should never reach here */
-  return;
-}
 
 int agent_env_main(int argc, char **argv)
 {
-  char *p;
-  void *handle;
-  union {
-    rc_function_t func;
-    void * obj;
-  } alias;
-  char *boot_argv[]  = { "agent", "env", "boot",  NULL };
-  char *start_argv[] = { "agent", "env", "start", NULL };
-  char *stop_argv[] = { "agent", "env", "stop", NULL };
+  bool debug = false;
+  int opt = 0;
+  int rc = 0;
+  char *ns = NULL;
+  char *conf_file = AGENT_ENV_CONFIG_FILE_PATH;
+  char *init_conf = NULL;
+  size_t init_conf_len = 0;
+  int s = 0;
+  char *name = strrchr(argv[0], '/');
+  name = name ? name+1 : argv[0];
 
-  int threads_max = 0;
-  int s;
-  pthread_t sig_thread;
-  sigset_t sigset;
+  if (!strcmp(name, "ezcd")) {
+    debug = true;
+  }
+
+  while ((opt = getopt(argc, argv, "c:i:n:")) != -1) {
+    switch (opt) {
+    case 'c':
+      conf_file = optarg;
+      break;
+    case 'i':
+      if (init_conf != NULL) {
+        printf("init_conf has been set to [%s]\n", init_conf);
+        printf("skip setting to [%s]\n", optarg);
+      }
+      else {
+        init_conf = strdup(optarg);
+      }
+      break;
+    case 'n':
+      ns = optarg;
+      break;
+    default: /* '?' */
+      agent_env_show_usage(argv[0]);
+      rc = -EZCFG_E_ARGUMENT;
+      goto func_out;
+    }
+  }
+
+
+  /* try to get init_conf from conf_file */
+  if (init_conf == NULL) {
+    if (EZCFG_RET_OK != utils_file_get_content(conf_file, &init_conf, &init_conf_len)) {
+      printf("can't get file [%s] content.\n", conf_file);
+      rc = -EZCFG_E_ARGUMENT;
+      goto func_out;
+    }
+  }
 
   /* unset umask */
   s = chdir("/");
   if (s == -1) {
     DBG("<6>agent_env: chdir error!\n");
-    return (EXIT_FAILURE);
+    rc = -EZCFG_E_RESOURCE;
+    goto func_out;
   }
   umask(0);
 
@@ -237,186 +174,13 @@ int agent_env_main(int argc, char **argv)
   while (*++argv)
     memset(*argv, 0, strlen(*argv));
 
-  /* run agent env boot processes */
-  handle = dlopen("/lib/rcso/rc_agent.so", RTLD_NOW);
-  if (handle == NULL) {
-    DBG("<6>agent_env: dlopen(%s) error %s\n", "/lib/rcso/rc_agent.so", dlerror());
-    return (EXIT_FAILURE);
-  }
-
-  /* clear any existing error */
-  dlerror();
-
-  alias.obj = dlsym(handle, "rc_agent");
-
-  if ((p = dlerror()) != NULL)  {
-    DBG("<6>agent_env: dlsym error %s\n", p);
-    dlclose(handle);
-    return (EXIT_FAILURE);
-  }
-
-  alias.func(ARRAY_SIZE(boot_argv) - 1, boot_argv);
-
-  /* close loader handle */
-  dlclose(handle);
-
-  /* init */
-  signal(SIGCHLD, init_reap);
-  signal(SIGUSR1, init_halt_reboot_poweroff);
-  signal(SIGTERM, init_halt_reboot_poweroff);
-  signal(SIGUSR2, init_halt_reboot_poweroff);
-
-  sigemptyset(&sigset);
-
-  if (utils_boot_partition_is_ready() == false) {
-    DBG("<6>agent_env: utils_boot_partition_is_ready() == false!\n");
-    start_argv[2] = "bootstrap";
-  }
-
-  /* run agent env start processes */
-  handle = dlopen("/lib/rcso/rc_agent.so", RTLD_NOW);
-  if (!handle) {
-    DBG("<6>agent_env: dlopen(%s) error %s\n", "/lib/rcso/rc_agent.so", dlerror());
-    return (EXIT_FAILURE);
-  }
-
-  /* clear any existing error */
-  dlerror();
-
-  alias.obj = dlsym(handle, "rc_agent");
-
-  if ((p = dlerror()) != NULL)  {
-    DBG("<6>agent_env: dlsym error %s\n", p);
-    dlclose(handle);
-    return (EXIT_FAILURE);
-  }
-
-  alias.func(ARRAY_SIZE(start_argv) - 1, start_argv);
-
-  /* close loader handle */
-  dlclose(handle);
-
-  /* run main loop forever */
-  /* set scheduling priority for the main daemon process */
-  setpriority(PRIO_PROCESS, 0, AGENT_ENV_PRIORITY);
-
-  setsid();
-
-  /* main process */
-  INFO("<6>agent_env: booting...\n");
-  /* prepare signal handling thread */
-  sigemptyset(&sigset);
-  sigaddset(&sigset, SIGCHLD);
-  sigaddset(&sigset, SIGUSR1);
-  sigaddset(&sigset, SIGTERM);
-  sigaddset(&sigset, SIGUSR2);
-  s = pthread_sigmask(SIG_BLOCK, &sigset, NULL);
-  if (s != 0) {
-    DBG("<6>agent_env: pthread_sigmask\n");
-    handle_error_en(s, "pthread_sigmask");
-  }
-
-  /* get root thread id */
-  root_thread = pthread_self();
-
-  s = pthread_create(&sig_thread, NULL, &sig_thread_routine, (void *) &sigset);
-  if (s != 0) {
-    DBG("<6>agent: pthread_create\n");
-    handle_error_en(s, "pthread_create");
-  }
-
-  if (threads_max < EZCFG_THREAD_MIN_NUM) {
-    int memsize = utils_get_mem_size_mb();
-
-    /* set value depending on the amount of RAM */
-    if (memsize > 0)
-      threads_max = EZCFG_THREAD_MIN_NUM + (memsize / 8);
-    else
-      threads_max = EZCFG_THREAD_MIN_NUM;
-  }
-
-  /* prepare agent master thread */
-  if (utils_init_ezcfg_api(AGENT_ENV_CONFIG_FILE_PATH) == false) {
-    DBG("<6>agent_env: init ezcfg_api\n");
-    return (EXIT_FAILURE);
-  }
-
-  agent = ezcfg_api_agent_start("agent_env", threads_max);
-  if (agent == NULL) {
-    DBG("<6>agent_env: Cannot initialize agent_env\n");
-    return (EXIT_FAILURE);
-  }
-
-  INFO("<6>agent_env: starting version " VERSION "\n");
-
-  /* wait for exit signal */
-  s = pthread_join(sig_thread, NULL);
-  if (s != 0) {
-    ezcfg_api_agent_stop(agent);
-    DBG("<6>agent_env: pthread_join\n");
-    handle_error_en(s, "pthread_join");
-  }
-
-  /* reset signal handlers */
-  signal(SIGUSR1, SIG_DFL);
-  signal(SIGTERM, SIG_DFL);
-  signal(SIGUSR2, SIG_DFL);
-  sigfillset(&sigset);
-  sigprocmask(SIG_UNBLOCK, &sigset, NULL);
-
-  /* run agent env stop processes */
-  handle = dlopen("/lib/rcso/rc_agent.so", RTLD_NOW);
-  if (handle == NULL) {
-    DBG("<6>agent_env: dlopen(%s) error %s\n", "/lib/rcso/rc_agent.so", dlerror());
-    return (EXIT_FAILURE);
-  }
-
-  /* clear any existing error */
-  dlerror();
-
-  alias.obj = dlsym(handle, "rc_agent");
-
-  if ((p = dlerror()) != NULL)  {
-    DBG("<6>agent_env: dlsym error %s\n", p);
-    dlclose(handle);
-    return (EXIT_FAILURE);
-  }
-
-  alias.func(ARRAY_SIZE(stop_argv) - 1, stop_argv);
-
-  /* close loader handle */
-  dlclose(handle);
-
-  /* send signals to every process _except_ pid 1 */
-  kill(-1, SIGTERM);
-  sync();
-  sleep(1);
-
-  kill(-1, SIGKILL);
-  sync();
-  sleep(1);
-
-  if (rb == RB_HALT_SYSTEM)
-    p = "halt";
-  else if (rb == RB_AUTOBOOT)
-    p = "reboot";
-  else if (rb == RB_POWER_OFF)
-    p = "poweroff";
-  else
-    p = NULL;
-
-  if (p != NULL) {
-    DBG("<6>agent_env: Requesting system %s", p);
-  }
-
-  if (fork() == 0) {
-    /* child */
-    reboot(rb);
-    _exit(EXIT_SUCCESS);
-  }
-  while (1)
-    sleep(1);
+  rc = ezcfg_api_agent_start(init_conf, ns);
 
   /* should never run to this place!!! */
-  return (EXIT_FAILURE);
+func_out:
+  DBG("<6>agent_env: should never run to this place!!!\n");
+  if (init_conf)
+    free(init_conf);
+
+  return rc;
 }

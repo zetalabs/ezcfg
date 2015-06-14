@@ -38,7 +38,8 @@ ezcd_SOURCES += ../src/agent_env.c
 #ezcd_SOURCES += ../src/ezcm.c
 #ezcd_SOURCES += ../src/nvram.c
 #ezcd_SOURCES += ../src/rc.c
-ezcd_SOURCES += ../src/shelld.c
+ezcd_SOURCES += ../src/eznvc.c
+#ezcd_SOURCES += ../src/shelld.c
 #if CONFIG_EZBOX_SERVICE_EZCFG_IGRSD
 #ezcd_SOURCES += ../src/igrs_monitor.c
 #endif
@@ -155,178 +156,178 @@ endif
 AGENT_ENV_CFLAGS = -Wall -Werror -rdynamic -fPIC
 AGENT_ENV_CFLAGS += $(ezcd_CPPFLAGS)
 
-AGENT_ENV_SRC = env_action_base_files.c
-AGENT_ENV_SO = env_action_base_files.so
-AGENT_ENV_EXE = env_action_base_files.exe
+#AGENT_ENV_SRC = env_action_base_files.c
+#AGENT_ENV_SO = env_action_base_files.so
+#AGENT_ENV_EXE = env_action_base_files.exe
 
-AGENT_ENV_SRC += env_action_bootstrap.c
-AGENT_ENV_SO += env_action_bootstrap.so
-AGENT_ENV_EXE += env_action_bootstrap.exe
+#AGENT_ENV_SRC += env_action_bootstrap.c
+#AGENT_ENV_SO += env_action_bootstrap.so
+#AGENT_ENV_EXE += env_action_bootstrap.exe
 
 if CONFIG_EZBOX_EZCFG_CGROUP
-AGENT_ENV_SRC += env_action_cgroup.c
-AGENT_ENV_SO += env_action_cgroup.so
-AGENT_ENV_EXE += env_action_cgroup.exe
+#AGENT_ENV_SRC += env_action_cgroup.c
+#AGENT_ENV_SO += env_action_cgroup.so
+#AGENT_ENV_EXE += env_action_cgroup.exe
 endif
 
 if CONFIG_EZBOX_BR_LAN_NIC
-AGENT_ENV_SRC += env_action_br_lan_if.c
-AGENT_ENV_SO += env_action_br_lan_if.so
-AGENT_ENV_EXE += env_action_br_lan_if.exe
+#AGENT_ENV_SRC += env_action_br_lan_if.c
+#AGENT_ENV_SO += env_action_br_lan_if.so
+#AGENT_ENV_EXE += env_action_br_lan_if.exe
 endif
 
-AGENT_ENV_SRC += env_action_swap_partition.c
-AGENT_ENV_SO += env_action_swap_partition.so
-AGENT_ENV_EXE += env_action_swap_partition.exe
+#AGENT_ENV_SRC += env_action_swap_partition.c
+#AGENT_ENV_SO += env_action_swap_partition.so
+#AGENT_ENV_EXE += env_action_swap_partition.exe
 
-AGENT_ENV_SRC += env_action_data_storage.c
-AGENT_ENV_SO += env_action_data_storage.so
-AGENT_ENV_EXE += env_action_data_storage.exe
+#AGENT_ENV_SRC += env_action_data_storage.c
+#AGENT_ENV_SO += env_action_data_storage.so
+#AGENT_ENV_EXE += env_action_data_storage.exe
 
-AGENT_ENV_SRC += env_action_data_partition.c
-AGENT_ENV_SO += env_action_data_partition.so
-AGENT_ENV_EXE += env_action_data_partition.exe
+#AGENT_ENV_SRC += env_action_data_partition.c
+#AGENT_ENV_SO += env_action_data_partition.so
+#AGENT_ENV_EXE += env_action_data_partition.exe
 
 # LUKS/dm-crypt for data partition service
 if CONFIG_EZBOX_SERVICE_DMCRYPT_DATA_PARTITION
-AGENT_ENV_SRC += env_action_dmcrypt_data_partition.c
-AGENT_ENV_SO += env_action_dmcrypt_data_partition.so
-AGENT_ENV_EXE += env_action_dmcrypt_data_partition.exe
+#AGENT_ENV_SRC += env_action_dmcrypt_data_partition.c
+#AGENT_ENV_SO += env_action_dmcrypt_data_partition.so
+#AGENT_ENV_EXE += env_action_dmcrypt_data_partition.exe
 endif
 
 # network
 if CONFIG_EZBOX_ETH_LAN_NIC
-AGENT_ENV_SRC += env_action_eth_lan_if.c
-AGENT_ENV_SO += env_action_eth_lan_if.so
-AGENT_ENV_EXE += env_action_eth_lan_if.exe
+#AGENT_ENV_SRC += env_action_eth_lan_if.c
+#AGENT_ENV_SO += env_action_eth_lan_if.so
+#AGENT_ENV_EXE += env_action_eth_lan_if.exe
 endif
 
-AGENT_ENV_SRC += env_action_ezcd.c
-AGENT_ENV_SO += env_action_ezcd.so
-AGENT_ENV_EXE += env_action_ezcd.exe
+#AGENT_ENV_SRC += env_action_ezcd.c
+#AGENT_ENV_SO += env_action_ezcd.so
+#AGENT_ENV_EXE += env_action_ezcd.exe
 
-AGENT_ENV_SRC += env_action_ezcm.c
-AGENT_ENV_SO += env_action_ezcm.so
-AGENT_ENV_EXE += env_action_ezcm.exe
+#AGENT_ENV_SRC += env_action_ezcm.c
+#AGENT_ENV_SO += env_action_ezcm.so
+#AGENT_ENV_EXE += env_action_ezcm.exe
 
 if CONFIG_EZBOX_SERVICE_IPTABLES
-AGENT_ENV_SRC += env_action_iptables.c
-AGENT_ENV_SO += env_action_iptables.so
-AGENT_ENV_EXE += env_action_iptables.exe
+#AGENT_ENV_SRC += env_action_iptables.c
+#AGENT_ENV_SO += env_action_iptables.so
+#AGENT_ENV_EXE += env_action_iptables.exe
 endif
 
 # klogd service
 if CONFIG_EZBOX_SERVICE_KLOGD
-AGENT_ENV_SRC += env_action_klogd.c
-AGENT_ENV_SO += env_action_klogd.so
-AGENT_ENV_EXE += env_action_klogd.exe
+#AGENT_ENV_SRC += env_action_klogd.c
+#AGENT_ENV_SO += env_action_klogd.so
+#AGENT_ENV_EXE += env_action_klogd.exe
 endif
 
 if CONFIG_EZBOX_LAN_NIC
-AGENT_ENV_SRC += env_action_lan.c
-AGENT_ENV_SO += env_action_lan.so
-AGENT_ENV_EXE += env_action_lan.exe
+#AGENT_ENV_SRC += env_action_lan.c
+#AGENT_ENV_SO += env_action_lan.so
+#AGENT_ENV_EXE += env_action_lan.exe
 endif
 
-AGENT_ENV_SRC += env_action_load_modules.c
-AGENT_ENV_SO += env_action_load_modules.so
-AGENT_ENV_EXE += env_action_load_modules.exe
+#AGENT_ENV_SRC += env_action_load_modules.c
+#AGENT_ENV_SO += env_action_load_modules.so
+#AGENT_ENV_EXE += env_action_load_modules.exe
 
-AGENT_ENV_SRC += env_action_login.c
-AGENT_ENV_SO += env_action_login.so
-AGENT_ENV_EXE += env_action_login.exe
+#AGENT_ENV_SRC += env_action_login.c
+#AGENT_ENV_SO += env_action_login.so
+#AGENT_ENV_EXE += env_action_login.exe
 
-AGENT_ENV_SRC += env_action_loopback.c
-AGENT_ENV_SO += env_action_loopback.so
-AGENT_ENV_EXE += env_action_loopback.exe
+#AGENT_ENV_SRC += env_action_loopback.c
+#AGENT_ENV_SO += env_action_loopback.so
+#AGENT_ENV_EXE += env_action_loopback.exe
 
-AGENT_ENV_SRC += env_action_mount_system_fs.c
-AGENT_ENV_SO += env_action_mount_system_fs.so
-AGENT_ENV_EXE += env_action_mount_system_fs.exe
+#AGENT_ENV_SRC += env_action_mount_system_fs.c
+#AGENT_ENV_SO += env_action_mount_system_fs.so
+#AGENT_ENV_EXE += env_action_mount_system_fs.exe
 
-AGENT_ENV_SRC += env_action_netbase.c
-AGENT_ENV_SO += env_action_netbase.so
-AGENT_ENV_EXE += env_action_netbase.exe
+#AGENT_ENV_SRC += env_action_netbase.c
+#AGENT_ENV_SO += env_action_netbase.so
+#AGENT_ENV_EXE += env_action_netbase.exe
 
-AGENT_ENV_SRC += env_action_nvram.c
-AGENT_ENV_SO += env_action_nvram.so
-AGENT_ENV_EXE += env_action_nvram.exe
+#AGENT_ENV_SRC += env_action_nvram.c
+#AGENT_ENV_SO += env_action_nvram.so
+#AGENT_ENV_EXE += env_action_nvram.exe
 
 if CONFIG_EZBOX_SERVICE_OPENSSL
-AGENT_ENV_SRC += env_action_openssl.c
-AGENT_ENV_SO += env_action_openssl.so
-AGENT_ENV_EXE += env_action_openssl.exe
+#AGENT_ENV_SRC += env_action_openssl.c
+#AGENT_ENV_SO += env_action_openssl.so
+#AGENT_ENV_EXE += env_action_openssl.exe
 endif
 
-AGENT_ENV_SRC += env_action_overlay_rootfs.c
-AGENT_ENV_SO += env_action_overlay_rootfs.so
-AGENT_ENV_EXE += env_action_overlay_rootfs.exe
+#AGENT_ENV_SRC += env_action_overlay_rootfs.c
+#AGENT_ENV_SO += env_action_overlay_rootfs.so
+#AGENT_ENV_EXE += env_action_overlay_rootfs.exe
 
 # PPP service
 if CONFIG_EZBOX_SERVICE_PPP
-AGENT_ENV_SRC += env_action_ppp_chap_secrets.c
-AGENT_ENV_SO += env_action_ppp_chap_secrets.so
-AGENT_ENV_EXE += env_action_ppp_chap_secrets.exe
+#AGENT_ENV_SRC += env_action_ppp_chap_secrets.c
+#AGENT_ENV_SO += env_action_ppp_chap_secrets.so
+#AGENT_ENV_EXE += env_action_ppp_chap_secrets.exe
 
-AGENT_ENV_SRC += env_action_ppp_pap_secrets.c
-AGENT_ENV_SO += env_action_ppp_pap_secrets.so
-AGENT_ENV_EXE += env_action_ppp_pap_secrets.exe
+#AGENT_ENV_SRC += env_action_ppp_pap_secrets.c
+#AGENT_ENV_SO += env_action_ppp_pap_secrets.so
+#AGENT_ENV_EXE += env_action_ppp_pap_secrets.exe
 endif
 
 # PPP RP-PPPoE service
 if CONFIG_EZBOX_SERVICE_PPP_RP_PPPOE
-AGENT_ENV_SRC += env_action_ppp_rp_pppoe.c
-AGENT_ENV_SO += env_action_ppp_rp_pppoe.so
-AGENT_ENV_EXE += env_action_ppp_rp_pppoe.exe
+#AGENT_ENV_SRC += env_action_ppp_rp_pppoe.c
+#AGENT_ENV_SO += env_action_ppp_rp_pppoe.so
+#AGENT_ENV_EXE += env_action_ppp_rp_pppoe.exe
 endif
 
-AGENT_ENV_SRC += env_action_preboot.c
-AGENT_ENV_SO += env_action_preboot.so
-AGENT_ENV_EXE += env_action_preboot.exe
+#AGENT_ENV_SRC += env_action_preboot.c
+#AGENT_ENV_SO += env_action_preboot.so
+#AGENT_ENV_EXE += env_action_preboot.exe
 
-AGENT_ENV_SRC += env_action_shelld.c
-AGENT_ENV_SO += env_action_shelld.so
-AGENT_ENV_EXE += env_action_shelld.exe
+#AGENT_ENV_SRC += env_action_shelld.c
+#AGENT_ENV_SO += env_action_shelld.so
+#AGENT_ENV_EXE += env_action_shelld.exe
 
-AGENT_ENV_SRC += env_action_state.c
-AGENT_ENV_SO += env_action_state.so
-AGENT_ENV_EXE += env_action_state.exe
+#AGENT_ENV_SRC += env_action_state.c
+#AGENT_ENV_SO += env_action_state.so
+#AGENT_ENV_EXE += env_action_state.exe
 
 # syslogd service
 if CONFIG_EZBOX_SERVICE_SYSLOGD
-AGENT_ENV_SRC += env_action_syslogd.c
-AGENT_ENV_SO += env_action_syslogd.so
-AGENT_ENV_EXE += env_action_syslogd.exe
+#AGENT_ENV_SRC += env_action_syslogd.c
+#AGENT_ENV_SO += env_action_syslogd.so
+#AGENT_ENV_EXE += env_action_syslogd.exe
 endif
 
-AGENT_ENV_SRC += env_action_system.c
-AGENT_ENV_SO += env_action_system.so
-AGENT_ENV_EXE += env_action_system.exe
+#AGENT_ENV_SRC += env_action_system.c
+#AGENT_ENV_SO += env_action_system.so
+#AGENT_ENV_EXE += env_action_system.exe
 
-AGENT_ENV_SRC += env_action_udev_pop_nodes.c
-AGENT_ENV_SO += env_action_udev_pop_nodes.so
-AGENT_ENV_EXE += env_action_udev_pop_nodes.exe
+#AGENT_ENV_SRC += env_action_udev_pop_nodes.c
+#AGENT_ENV_SO += env_action_udev_pop_nodes.so
+#AGENT_ENV_EXE += env_action_udev_pop_nodes.exe
 
 if CONFIG_EZBOX_ETH_WAN_NIC
-AGENT_ENV_SRC += env_action_eth_wan_if.c
-AGENT_ENV_SO += env_action_eth_wan_if.so
-AGENT_ENV_EXE += env_action_eth_wan_if.exe
+#AGENT_ENV_SRC += env_action_eth_wan_if.c
+#AGENT_ENV_SO += env_action_eth_wan_if.so
+#AGENT_ENV_EXE += env_action_eth_wan_if.exe
 endif
 
 if CONFIG_EZBOX_WAN_NIC
-AGENT_ENV_SRC += env_action_wan.c
-AGENT_ENV_SO += env_action_wan.so
-AGENT_ENV_EXE += env_action_wan.exe
+#AGENT_ENV_SRC += env_action_wan.c
+#AGENT_ENV_SO += env_action_wan.so
+#AGENT_ENV_EXE += env_action_wan.exe
 
-AGENT_ENV_SRC += env_action_wan_if.c
-AGENT_ENV_SO += env_action_wan_if.so
-AGENT_ENV_EXE += env_action_wan_if.exe
+#AGENT_ENV_SRC += env_action_wan_if.c
+#AGENT_ENV_SO += env_action_wan_if.so
+#AGENT_ENV_EXE += env_action_wan_if.exe
 endif
 
 if CONFIG_EZBOX_WIFI_LAN_NIC
-AGENT_ENV_SRC += env_action_wifi_lan_if.c
-AGENT_ENV_SO += env_action_wifi_lan_if.so
-AGENT_ENV_EXE += env_action_wifi_lan_if.exe
+#AGENT_ENV_SRC += env_action_wifi_lan_if.c
+#AGENT_ENV_SO += env_action_wifi_lan_if.so
+#AGENT_ENV_EXE += env_action_wifi_lan_if.exe
 endif
 
 #AGENT_ENV_SO = $(subst .c,.so,$(AGENT_ENV_SRC))

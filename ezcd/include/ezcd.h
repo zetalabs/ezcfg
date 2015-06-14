@@ -52,6 +52,7 @@ int utils_get_swap_device_path(char *buf, int buf_len);
 
 bool utils_file_get_line(FILE *fp, char *buf, size_t size, char *comment, char *remove);
 bool utils_file_print_line(FILE *fp, char *buf, size_t size, const char *fmt, ...);
+int utils_file_get_content(const char *path, char **pbuf, size_t *plen);
 
 bool utils_init_ezcfg_api(const char *path);
 
@@ -136,6 +137,9 @@ int utils_nvram_cmp(const char *name, const char *value);
 
 /* command entry point */
 int agent_env_main(int argc, char **argv);
+int eznvc_main(int argc, char **argv);
+
+#if 0
 int preinit_main(int argc, char **argv);
 int init_main(int argc, char **argv);
 int ezcd_main(int argc, char **argv);
@@ -143,6 +147,7 @@ int ezcm_main(int argc, char **argv);
 int nvram_main(int argc, char **argv);
 int rc_main(int argc, char **argv);
 int shelld_main(int argc, char **argv);
+
 #if (HAVE_EZBOX_SERVICE_EZCFG_IGRSD == 1)
 int igrs_monitor_main(int argc, char **argv);
 #endif
@@ -152,5 +157,6 @@ int upnp_monitor_main(int argc, char **argv);
 int ubootenv_main(int argc, char **argv);
 int udhcpc_script_main(int argc, char **argv);
 int upfw_main(int argc, char **argv);
+#endif
 
 #endif

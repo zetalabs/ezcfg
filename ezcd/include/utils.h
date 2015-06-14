@@ -98,17 +98,20 @@
 #define DATA_ROOTFS_VAR_DIR_PATH		DATA_ROOTFS_DIR_PATH "/var"
 
 /* ezcd command config file path */
-#define EZCD_CONFIG_FILE_PATH	"/etc/ezcd.conf"
-#define EZCD_CONFIG_FILE_PATH_NEW	"/etc/ezcd.conf.new"
+#define EZCD_CONFIG_FILE_PATH           "/etc/ezcd/ezcd.conf"
+#define EZCD_CONFIG_FILE_PATH_NEW       "/etc/ezcd/ezcd.conf.new"
+
+/* eznvc command config file path */
+#define EZNVC_CONFIG_FILE_PATH          "/etc/eznvc/eznvc.conf"
 
 /* ezcm command config file path */
-//#define EZCM_CONFIG_FILE_PATH	"/etc/ezcm.conf"
+//#define EZCM_CONFIG_FILE_PATH           "/etc/ezcm.conf"
 
 /* nvram command config file path */
-//#define NVRAM_CONFIG_FILE_PATH	"/etc/nvram.conf"
+//#define NVRAM_CONFIG_FILE_PATH          "/etc/nvram.conf"
 
 /* upnp_monitor task file path */
-#define UPNP_MONITOR_TASK_FILE_PATH	"/etc/upnp_monitor/tasks"
+#define UPNP_MONITOR_TASK_FILE_PATH     "/etc/upnp_monitor/tasks"
 
 /* udhcpc script path */
 #define UDHCPC_SCRIPT_FILE_NAME	"default.script"

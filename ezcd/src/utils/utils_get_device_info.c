@@ -115,10 +115,10 @@ int utils_get_data_device_path(char *buf, int buf_len)
       if (S_ISREG(stat_buf.st_mode)) {
 	/* get data device path string */
 	p = utils_file_get_keyword_by_index(BOOT_CONFIG_FILE_PATH,
-					    NVRAM_SERVICE_OPTION(SYS, DATA_DEV) "=",
-					    DEVICE_INFO_PATH_INDEX);
+                                            NVRAM_SERVICE_OPTION(SYS, DATA_DEV) "=",
+                                            DEVICE_INFO_PATH_INDEX);
 	if (p != NULL) {
-	  rc = snprintf(buf, buf_len, "%s", p);
+            rc = snprintf(buf, buf_len, "%s", p);
 	  free(p);
 	}
 	return rc;
@@ -142,8 +142,8 @@ int utils_get_data_device_fs_type(char *buf, int buf_len)
       if (S_ISREG(stat_buf.st_mode)) {
 	/* get data device file system type string */
 	p = utils_file_get_keyword_by_index(BOOT_CONFIG_FILE_PATH,
-					    NVRAM_SERVICE_OPTION(SYS, DATA_DEV) "=",
-					    DEVICE_INFO_FS_TYPE_INDEX);
+                                            NVRAM_SERVICE_OPTION(SYS, DATA_DEV) "=",
+                                            DEVICE_INFO_FS_TYPE_INDEX);
 	if (p != NULL) {
 	  rc = snprintf(buf, buf_len, "%s", p);
 	  free(p);
@@ -169,8 +169,8 @@ int utils_get_hdd_device_path(char *buf, int buf_len)
       if (S_ISREG(stat_buf.st_mode)) {
 	/* get data device path string */
 	p = utils_file_get_keyword_by_index(BOOT_CONFIG_FILE_PATH,
-					    NVRAM_SERVICE_OPTION(SYS, HDD_DEVICE) "=",
-					    DEVICE_INFO_PATH_INDEX);
+                                            NVRAM_SERVICE_OPTION(SYS, HDD_DEVICE) "=",
+                                            DEVICE_INFO_PATH_INDEX);
 	if (p != NULL) {
 	  rc = snprintf(buf, buf_len, "%s", p);
 	  free(p);
@@ -196,8 +196,8 @@ int utils_get_swap_device_path(char *buf, int buf_len)
       if (S_ISREG(stat_buf.st_mode)) {
 	/* get data device path string */
 	p = utils_file_get_keyword_by_index(BOOT_CONFIG_FILE_PATH,
-					    NVRAM_SERVICE_OPTION(SYS, SWAP_DEV) "=",
-					    DEVICE_INFO_PATH_INDEX);
+                                            NVRAM_SERVICE_OPTION(SYS, SWAP_DEV) "=",
+                                            DEVICE_INFO_PATH_INDEX);
 	if (p != NULL) {
 	  rc = snprintf(buf, buf_len, "%s", p);
 	  free(p);

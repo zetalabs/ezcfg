@@ -50,8 +50,14 @@ int main(int argc, char **argv)
   if (!strcmp(argv[0], "/sbin/agent_env")) {
     return agent_env_main(argc, argv);
   }
+  else if (!strcmp(name, "ezcd")) {
+    return agent_env_main(argc, argv);
+  }
+  else if (!strcmp(name, "eznvc")) {
+    return eznvc_main(argc, argv);
+  }
   else {
-    printf("Unkown name [%s]!\n", name);
+    printf("Unknown name [%s]!\n", name);
     return (EXIT_FAILURE);
   }
 }

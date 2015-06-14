@@ -16,6 +16,7 @@ ezcfg_api_util_get_conf_string
 ezcfg_api_agent_start
 ezcfg_api_agent_stop
 ezcfg_api_agent_reload
+ezcfg_api_agent_set_debug
 ezcfg_api_master_start
 ezcfg_api_master_stop
 ezcfg_api_master_reload
@@ -56,6 +57,7 @@ ezcfg_api_arg_nvram_ssl_get_certificate_chain_file
 ezcfg_api_arg_nvram_ssl_set_certificate_chain_file
 ezcfg_api_arg_nvram_ssl_get_private_key_file
 ezcfg_api_arg_nvram_ssl_set_private_key_file
+ezcfg_api_nvram_change
 ezcfg_api_nvram_get
 ezcfg_api_nvram_set
 ezcfg_api_nvram_unset

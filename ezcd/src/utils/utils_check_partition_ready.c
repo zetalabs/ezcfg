@@ -39,18 +39,6 @@
 
 #include "ezcd.h"
 
-#if 0
-#define DBG(format, args...) do {\
-	FILE *dbg_fp = fopen("/dev/kmsg", "a"); \
-	if (dbg_fp) { \
-		fprintf(dbg_fp, format, ## args); \
-		fclose(dbg_fp); \
-	} \
-} while(0)
-#else
-#define DBG(format, args...)
-#endif
-
 bool utils_boot_partition_is_ready(void)
 {
 	char name[64];
