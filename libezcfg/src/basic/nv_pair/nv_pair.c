@@ -44,6 +44,8 @@ struct ezcfg_nv_pair *ezcfg_nv_pair_new(char *name, char *value)
   struct ezcfg_nv_pair *nvp = NULL;
   int len = 0;
 
+  ASSERT(name != NULL);
+
   /* allocate nvp and clean it */
   nvp = calloc(1, sizeof(struct ezcfg_nv_pair));
   if (nvp == NULL) {
@@ -51,14 +53,13 @@ struct ezcfg_nv_pair *ezcfg_nv_pair_new(char *name, char *value)
   }
 
   /* name */
-  if (name) {
-    len = strlen(name);
-    nvp->n = malloc(len+1);
-    if (nvp->n == NULL) {
-      goto exit_fail;
-    }
-    nvp->nlen = len+1;
+  len = strlen(name);
+  nvp->n = malloc(len+1);
+  if (nvp->n == NULL) {
+    goto exit_fail;
   }
+  strcpy(nvp->n, name);
+  nvp->nlen = len+1;
 
   /* value */
   if (value) {
@@ -67,6 +68,7 @@ struct ezcfg_nv_pair *ezcfg_nv_pair_new(char *name, char *value)
     if (nvp->v == NULL) {
       goto exit_fail;
     }
+    strcpy(nvp->v, value);
     nvp->vlen = len+1;
   }
 
@@ -105,6 +107,7 @@ int ezcfg_nv_pair_cmp_n(struct ezcfg_nv_pair *nvp1, struct ezcfg_nv_pair *nvp2)
   ASSERT(nvp1->n != NULL);
   ASSERT(nvp2->n != NULL);
 
+  EZDBG("%s(%d) nvp1->n=[%s] nvp2->n=[%s]\n", __func__, __LINE__, nvp1->n, nvp2->n);
   return strcmp(nvp1->n, nvp2->n);
 }
 

@@ -148,6 +148,12 @@ int ezcfg_process_new(struct ezcfg *ezcfg, char *ns)
 
   ASSERT (ezcfg != NULL);
 
+  /* increase ezcfg library context reference */
+  if (ezcfg_inc_ref(ezcfg) != EZCFG_RET_OK) {
+    EZDBG("ezcfg_inc_ref() failed\n");
+    return EZCFG_RET_FAIL;
+  }
+
   meta_nvram_prefix_len = strlen(EZCFG_NVRAM_PREFIX_META);
 
   /* build sub-namespace for process */

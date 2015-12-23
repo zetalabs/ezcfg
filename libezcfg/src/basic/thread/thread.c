@@ -58,7 +58,7 @@ struct ezcfg_thread {
   void *(*start_routine)(void *);
   void *arg;
   int (*arg_del_handler)(void *);
-  int (*stop)(struct ezcfg_thread *);
+  int (*stop)(void *);
 };
 
 /* mutex for thread_state manipulate */
@@ -117,6 +117,30 @@ static int unlock_thread_state_mutex(void)
   }
 }
 
+static int thread_clr(struct ezcfg_thread *thread)
+{
+  int ret = EZCFG_RET_FAIL;
+
+  if (thread->state != THREAD_STATE_STOPPED) {
+    EZDBG("%s(%d) thread must be stopped firstly\n", __func__, __LINE__);
+    return EZCFG_RET_FAIL;
+  }
+
+  if (thread->arg) {
+    if (thread->arg_del_handler) {
+      ret = thread->arg_del_handler(thread->arg);
+    }
+    else {
+      free(thread->arg);
+      ret = EZCFG_RET_OK;
+    }
+    if (ret != EZCFG_RET_OK) {
+      return EZCFG_RET_FAIL;
+    }
+  }
+
+  return EZCFG_RET_OK;
+}
 
 /**
  * public functions
@@ -126,7 +150,7 @@ struct ezcfg_thread *ezcfg_thread_new(struct ezcfg *ezcfg, char *ns)
 {
   struct ezcfg_thread *thread = NULL;
   int detachstate = PTHREAD_CREATE_DETACHED;
-  int stacksize = 0;
+  long int stacksize = 0;
   char name[EZCFG_NAME_MAX] = "";
   struct ezcfg_linked_list *list = NULL;
   struct ezcfg_nv_pair *data = NULL;
@@ -162,30 +186,38 @@ struct ezcfg_thread *ezcfg_thread_new(struct ezcfg *ezcfg, char *ns)
 
   /* detachstate */
   ret = ezcfg_util_snprintf_ns_name(name, sizeof(name), ns, NVRAM_NAME(THREAD, DETACHSTATE));
+  EZDBG("%s(%d) name=[%s]\n", __func__, __LINE__, name);
   if (ret != EZCFG_RET_OK) {
+    EZDBG("%s(%d)\n", __func__, __LINE__);
     goto exit_fail;
   }
   data = ezcfg_nv_pair_new(name, NULL);
   if (data == NULL) {
+    EZDBG("%s(%d)\n", __func__, __LINE__);
     goto exit_fail;
   }
   p_detachstate = ezcfg_nv_pair_get_n(data);
   if (ezcfg_linked_list_append(list, data) != EZCFG_RET_OK) {
+    EZDBG("%s(%d)\n", __func__, __LINE__);
     goto exit_fail;
   }
   data = NULL;
 
   /* stacksize */
   ret = ezcfg_util_snprintf_ns_name(name, sizeof(name), ns, NVRAM_NAME(THREAD, STACKSIZE));
+  EZDBG("%s(%d) name=[%s]\n", __func__, __LINE__, name);
   if (ret != EZCFG_RET_OK) {
+    EZDBG("%s(%d)\n", __func__, __LINE__);
     goto exit_fail;
   }
   data = ezcfg_nv_pair_new(name, NULL);
   if (data == NULL) {
+    EZDBG("%s(%d)\n", __func__, __LINE__);
     goto exit_fail;
   }
   p_stacksize = ezcfg_nv_pair_get_n(data);
   if (ezcfg_linked_list_append(list, data) != EZCFG_RET_OK) {
+    EZDBG("%s(%d)\n", __func__, __LINE__);
     goto exit_fail;
   }
   data = NULL;
@@ -193,6 +225,7 @@ struct ezcfg_thread *ezcfg_thread_new(struct ezcfg *ezcfg, char *ns)
   /* get these value from nvram */
   ret = ezcfg_common_get_nvram_entries(ezcfg, list);
   if (ret != EZCFG_RET_OK) {
+    EZDBG("%s(%d)\n", __func__, __LINE__);
     goto exit_fail;
   }
 
@@ -201,21 +234,32 @@ struct ezcfg_thread *ezcfg_thread_new(struct ezcfg *ezcfg, char *ns)
   for (i = 1; i < list_length+1; i++) {
     data = (struct ezcfg_nv_pair *)ezcfg_linked_list_get_node_data_by_index(list, i);
     if (data == NULL) {
+      EZDBG("%s(%d)\n", __func__, __LINE__);
       goto exit_fail;
     }
     if (ezcfg_nv_pair_get_n(data) == p_detachstate) {
       val = ezcfg_nv_pair_get_v(data);
       if (val == NULL) {
+        EZDBG("%s(%d)\n", __func__, __LINE__);
         goto exit_fail;
       }
-      detachstate = atoi(val);
+      if (strcmp(val, "PTHREAD_CREATE_JOINABLE") == 0) {
+        detachstate = PTHREAD_CREATE_JOINABLE;
+      }
+      else if (strcmp(val, "PTHREAD_CREATE_DETACHED") == 0) {
+        detachstate = PTHREAD_CREATE_DETACHED;
+      }
+      else {
+        EZDBG("%s(%d) unknown detachstate, use default PTHREAD_CREATE_DETACHED.\n", __func__, __LINE__);
+      }
     }
     else if (ezcfg_nv_pair_get_n(data) == p_stacksize) {
       val = ezcfg_nv_pair_get_v(data);
       if (val == NULL) {
+        EZDBG("%s(%d)\n", __func__, __LINE__);
         goto exit_fail;
       }
-      stacksize = atoi(val);
+      stacksize = strtol(val, NULL, 0);
     }
   }
   data = NULL;
@@ -226,12 +270,14 @@ struct ezcfg_thread *ezcfg_thread_new(struct ezcfg *ezcfg, char *ns)
 
   s = pthread_attr_init(&(thread->attr));
   if (s != 0) {
+    EZDBG("%s(%d)\n", __func__, __LINE__);
     err(ezcfg, "%s: pthread_attr_init %s", __func__, strerror(s));
     goto exit_fail;
   }
 
   s = pthread_attr_setdetachstate(&(thread->attr), detachstate);
   if (s != 0) {
+    EZDBG("%s(%d)\n", __func__, __LINE__);
     err(ezcfg, "%s: pthread_attr_setdetachstate %s", __func__, strerror(s));
     goto exit_fail;
   }
@@ -239,6 +285,7 @@ struct ezcfg_thread *ezcfg_thread_new(struct ezcfg *ezcfg, char *ns)
   if (stacksize > 0) {
     s = pthread_attr_setstacksize(&(thread->attr), stacksize);
     if (s != 0) {
+      EZDBG("%s(%d)\n", __func__, __LINE__);
       err(ezcfg, "%s: %s", __func__, strerror(s));
       goto exit_fail;
     }
@@ -252,13 +299,19 @@ struct ezcfg_thread *ezcfg_thread_new(struct ezcfg *ezcfg, char *ns)
 exit_fail:
   EZDBG("%s(%d)\n", __func__, __LINE__);
   if (data) {
+    EZDBG("%s(%d)\n", __func__, __LINE__);
     ezcfg_nv_pair_del(data);
+    EZDBG("%s(%d)\n", __func__, __LINE__);
   }
   if (list) {
+    EZDBG("%s(%d)\n", __func__, __LINE__);
     ezcfg_linked_list_del(list);
+    EZDBG("%s(%d)\n", __func__, __LINE__);
   }
   if (thread != NULL) {
+    EZDBG("%s(%d)\n", __func__, __LINE__);
     free(thread);
+    EZDBG("%s(%d)\n", __func__, __LINE__);
   }
   /* decrease ezcfg library context reference */
   if (ezcfg_dec_ref(ezcfg) != EZCFG_RET_OK) {
@@ -267,7 +320,7 @@ exit_fail:
   return NULL;
 }
 
-int ezcfg_thread_del(struct ezcfg_thread *thread)
+int ezcfg_thread_clr(struct ezcfg_thread *thread)
 {
   int ret = EZCFG_RET_FAIL;
 
@@ -278,45 +331,64 @@ int ezcfg_thread_del(struct ezcfg_thread *thread)
     return EZCFG_RET_FAIL;
   }
 
-  if (thread->state != THREAD_STATE_STOPPED) {
-    EZDBG("thread must stop first\n");
-    if (unlock_thread_state_mutex() != EZCFG_RET_OK) {
-      EZDBG("unlock_thread_state_mutex() failed\n");
-    }
-    return EZCFG_RET_FAIL;
-  }
+  ret = thread_clr(thread);
 
-  if (thread->arg) {
-    if (thread->arg_del_handler) {
-      ret = thread->arg_del_handler(thread->arg);
-    }
-    else {
-      free(thread->arg);
-      ret = EZCFG_RET_OK;
-    }
-    if (ret != EZCFG_RET_OK) {
-      if (unlock_thread_state_mutex() != EZCFG_RET_OK) {
-        EZDBG("unlock_thread_state_mutex() failed\n");
-      }
-      return EZCFG_RET_FAIL;
-    }
-  }
-
-  free(thread);
   if (unlock_thread_state_mutex() != EZCFG_RET_OK) {
     EZDBG("unlock_thread_state_mutex() failed\n");
   }
-  return EZCFG_RET_OK;
+  return ret;
+}
+
+int ezcfg_thread_del(struct ezcfg_thread *thread)
+{
+  struct ezcfg *ezcfg = NULL;
+  int ret = EZCFG_RET_FAIL;
+
+  ASSERT(thread != NULL);
+
+  ezcfg = thread->ezcfg;
+
+  if (lock_thread_state_mutex() != EZCFG_RET_OK) {
+    EZDBG("lock_thread_state_mutex() failed\n");
+    return EZCFG_RET_FAIL;
+  }
+
+  ret = thread_clr(thread);
+  if (ret == EZCFG_RET_OK) {
+    free(thread);
+  }
+
+  if (unlock_thread_state_mutex() != EZCFG_RET_OK) {
+    EZDBG("unlock_thread_state_mutex() failed\n");
+  }
+
+  /* decrease ezcfg library context reference */
+  if (ezcfg_dec_ref(ezcfg) != EZCFG_RET_OK) {
+    EZDBG("ezcfg_dec_ref() failed\n");
+  }
+
+  return ret;
 }
 
 int ezcfg_thread_set_start_routine(
   struct ezcfg_thread *thread,
-  void *(*func)(void *))
+  void *(*func)(void *), void *arg)
 {
   ASSERT(thread != NULL);
   ASSERT(func != NULL);
 
   thread->start_routine = func;
+  thread->arg = arg;
+  return EZCFG_RET_OK;
+}
+
+int ezcfg_thread_set_arg(
+  struct ezcfg_thread *thread,
+  void *arg)
+{
+  ASSERT(thread != NULL);
+
+  thread->arg = arg;
   return EZCFG_RET_OK;
 }
 
@@ -333,7 +405,7 @@ int ezcfg_thread_set_arg_del_handler(
 
 int ezcfg_thread_set_stop(
   struct ezcfg_thread *thread,
-  int (*func)(struct ezcfg_thread *))
+  int (*func)(void *))
 {
   ASSERT(thread != NULL);
   ASSERT(func != NULL);
@@ -358,23 +430,24 @@ int ezcfg_thread_start(struct ezcfg_thread *thread)
   }
 
   if (thread->state != THREAD_STATE_STOPPED) {
-    EZDBG("thread must stop first\n");
+    EZDBG("thread must be stopped firstly\n");
     if (unlock_thread_state_mutex() != EZCFG_RET_OK) {
       EZDBG("unlock_thread_state_mutex() failed\n");
     }
     return EZCFG_RET_FAIL;
   }
 
+  /* set state to RUNNING first, thread->start_routine() may check it */
+  thread->state = THREAD_STATE_RUNNING;
   s = pthread_create(&(thread->thread_id), &(thread->attr), thread->start_routine, thread->arg);
   if (s != 0) {
     err(ezcfg, "%s: %s", __func__, strerror(s));
+    thread->state = THREAD_STATE_STOPPED;
     if (unlock_thread_state_mutex() != EZCFG_RET_OK) {
       EZDBG("unlock_thread_state_mutex() failed\n");
     }
     return EZCFG_RET_FAIL;
   }
-
-  thread->state = THREAD_STATE_RUNNING;
 
   if (unlock_thread_state_mutex() != EZCFG_RET_OK) {
     EZDBG("unlock_thread_state_mutex() failed\n");
@@ -388,40 +461,99 @@ int ezcfg_thread_stop(struct ezcfg_thread *thread)
 
   ASSERT(thread != NULL);
 
+  EZDBG("%s(%d)\n", __func__, __LINE__);
   if (lock_thread_state_mutex() != EZCFG_RET_OK) {
     EZDBG("lock_thread_state_mutex() failed\n");
     return EZCFG_RET_FAIL;
   }
 
+  EZDBG("%s(%d)\n", __func__, __LINE__);
   if (thread->state == THREAD_STATE_STOPPED) {
     EZDBG("thread has already stopped\n");
     ret = EZCFG_RET_OK;
     goto func_exit;
   }
 
+  EZDBG("%s(%d)\n", __func__, __LINE__);
   if (thread->state != THREAD_STATE_RUNNING) {
-    EZDBG("thread must stop first\n");
+    EZDBG("%s(%d) thread must be running\n", __func__, __LINE__);
     ret = EZCFG_RET_FAIL;
     goto func_exit;
   }
 
+  EZDBG("%s(%d)\n", __func__, __LINE__);
   if (thread->stop) {
-    ret = thread->stop(thread);
+    EZDBG("%s(%d)\n", __func__, __LINE__);
+    thread->state = THREAD_STATE_STOPPING;
+    ret = thread->stop(thread->arg);
     if (ret == EZCFG_RET_OK) {
-      thread->state = THREAD_STATE_STOPPING;
+      /* FIXME: thread->stop() makes thread->state = THREAD_STATE_STOPPING */
+      /* now it should be STPPED */
+      thread->state = THREAD_STATE_STOPPED;
     }
     else {
       ret = EZCFG_RET_FAIL;
     }
   }
   else {
-    ret = EZCFG_RET_FAIL;
+    EZDBG("thread has no stop() function, tag it stopped.\n");
+    thread->state = THREAD_STATE_STOPPED;
+    ret = EZCFG_RET_OK;
   }
 
 func_exit:
+  EZDBG("%s(%d)\n", __func__, __LINE__);
   if (unlock_thread_state_mutex() != EZCFG_RET_OK) {
     EZDBG("unlock_thread_state_mutex() failed\n");
   }
   return ret;
+}
+
+int ezcfg_thread_state_is_running(struct ezcfg_thread *thread)
+{
+  ASSERT(thread != NULL);
+
+  if (thread->state == THREAD_STATE_RUNNING) {
+    return EZCFG_RET_OK;
+  }
+  else {
+    return EZCFG_RET_FAIL;
+  }
+}
+
+int ezcfg_thread_state_is_stopped(struct ezcfg_thread *thread)
+{
+  ASSERT(thread != NULL);
+
+  if (thread->state == THREAD_STATE_STOPPED) {
+    return EZCFG_RET_OK;
+  }
+  else {
+    return EZCFG_RET_FAIL;
+  }
+}
+
+int ezcfg_thread_del_handler(void *data)
+{
+  ASSERT(data != NULL);
+  return ezcfg_thread_del((struct ezcfg_thread *)data);
+}
+
+int ezcfg_thread_cmp_handler(const void *d1, const void *d2)
+{
+  struct ezcfg_thread *p1 = NULL;
+  struct ezcfg_thread *p2 = NULL;
+
+  ASSERT(d1 != NULL);
+  ASSERT(d2 != NULL);
+
+  p1 = (struct ezcfg_thread *)d1;
+  p2 = (struct ezcfg_thread *)d2;
+  if (pthread_equal(p1->thread_id,p2->thread_id)) {
+    return 0;
+  }
+  else {
+    return -1;
+  }
 }
 

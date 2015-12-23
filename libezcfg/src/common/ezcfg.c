@@ -249,6 +249,9 @@ struct ezcfg *ezcfg_new(char *text)
   ezcfg->meta_nvram = NULL;
   ezcfg->nvram = NULL;
 
+  /* set this_ezcfg here to avoid ezcfg_del() assert error! */
+  this_ezcfg = ezcfg;
+
   if (text != NULL) {
     /* check text is the meta list format */
     json = local_json_new();
@@ -284,7 +287,6 @@ struct ezcfg *ezcfg_new(char *text)
   }
 
   /* new ezcfg OK! */
-  this_ezcfg = ezcfg;
   return ezcfg;
 
 fail_out:
@@ -415,7 +417,6 @@ int ezcfg_dec_ref(struct ezcfg *ezcfg)
   int ret = EZCFG_RET_FAIL;
 
   ASSERT (ezcfg != NULL);
-  //ASSERT (this_ezcfg != NULL);
   ASSERT (this_ezcfg == ezcfg);
 
   if (lock_ezcfg_ref_mutex() != EZCFG_RET_OK) {
@@ -507,6 +508,7 @@ int ezcfg_common_get_nvram_entries(struct ezcfg *ezcfg, struct ezcfg_linked_list
   ASSERT (ezcfg != NULL);
   ASSERT (list != NULL);
 
+  EZDBG("%s(%d)\n", __func__, __LINE__);
   nvram = ezcfg->nvram;
 
   list_length = ezcfg_linked_list_get_length(list);
@@ -514,6 +516,7 @@ int ezcfg_common_get_nvram_entries(struct ezcfg *ezcfg, struct ezcfg_linked_list
   if ((list_length > 0) && (nvram != NULL)) {
     ret = _local_nvram_mutex_lock(nvram);
     if (EZCFG_RET_OK != ret) {
+      EZDBG("%s(%d)\n", __func__, __LINE__);
       return EZCFG_RET_FAIL;
     }
     nvram_mutex_locked = 1;
@@ -525,18 +528,21 @@ int ezcfg_common_get_nvram_entries(struct ezcfg *ezcfg, struct ezcfg_linked_list
       if (nvram_mutex_locked) {
         _local_nvram_mutex_unlock(nvram);
       }
+      EZDBG("%s(%d)\n", __func__, __LINE__);
       return EZCFG_RET_FAIL;
     }
     if (data->n == NULL) {
       if (nvram_mutex_locked) {
         _local_nvram_mutex_unlock(nvram);
       }
+      EZDBG("%s(%d)\n", __func__, __LINE__);
       return EZCFG_RET_FAIL;
     }
     if (data->v) {
       free(data->v);
       data->v = NULL;
     }
+    EZDBG("%s(%d) data->n=[%s]\n", __func__, __LINE__,data->n);
     /* first try nvram */
     ret = _local_nvram_get_entry_value(nvram, data->n, &(data->v));
     if (EZCFG_RET_OK != ret) {
@@ -547,6 +553,7 @@ int ezcfg_common_get_nvram_entries(struct ezcfg *ezcfg, struct ezcfg_linked_list
         if (nvram_mutex_locked) {
           _local_nvram_mutex_unlock(nvram);
         }
+        EZDBG("%s(%d)\n", __func__, __LINE__);
         return EZCFG_RET_FAIL;
       }
     }
@@ -555,6 +562,7 @@ int ezcfg_common_get_nvram_entries(struct ezcfg *ezcfg, struct ezcfg_linked_list
   if (nvram_mutex_locked) {
     _local_nvram_mutex_unlock(nvram);
   }
+  EZDBG("%s(%d)\n", __func__, __LINE__);
   return EZCFG_RET_OK;
 }
 

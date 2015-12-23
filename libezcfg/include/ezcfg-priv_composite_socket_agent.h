@@ -27,4 +27,7 @@ int ezcfg_socket_agent_del(struct ezcfg_socket_agent *agent);
 int ezcfg_socket_agent_start(struct ezcfg_socket_agent *agent);
 int ezcfg_socket_agent_stop(struct ezcfg_socket_agent *agent);
 
+int ezcfg_socket_agent_is_running(struct ezcfg_socket_agent *agent);
+int ezcfg_socket_agent_is_stopped(struct ezcfg_socket_agent *agent);
+
 #endif /* _EZCFG_PRIV_COMPOSITE_SOCKET_AGENT_H_ */

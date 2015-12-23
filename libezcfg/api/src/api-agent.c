@@ -137,21 +137,35 @@ int ezcfg_api_agent_start(char *init_conf)
   }
   EZDBG("%s(%d)\n", __func__, __LINE__);
 
-  if (EZCFG_RET_OK == ezcfg_socket_agent_start(agent)) {
-    rc = 0;
+  if (EZCFG_RET_OK != ezcfg_socket_agent_start(agent)) {
+    EZDBG("%s(%d)\n", __func__, __LINE__);
+    rc = -EZCFG_E_RESOURCE ;
+    if (ezcfg_socket_agent_stop(agent) != EZCFG_RET_OK) {
+      EZDBG("%s(%d)\n", __func__, __LINE__);
+      goto func_out;
+    }
   }
   else {
-    ezcfg_socket_agent_stop(agent);
-    rc = -EZCFG_E_RESOURCE ;
+    EZDBG("%s(%d)\n", __func__, __LINE__);
+    rc = 0;
+  }
+
+  /* It should not return until master_thread stopped */
+  EZDBG("%s(%d)\n", __func__, __LINE__);
+  while (ezcfg_socket_agent_is_stopped(agent) != EZCFG_RET_OK) {
+    EZDBG("%s(%d)\n", __func__, __LINE__);
+    sleep(EZCFG_MASTER_WAIT_TIME);
   }
 
 func_out:
+  EZDBG("%s(%d)\n", __func__, __LINE__);
   if (agent)
     ezcfg_socket_agent_del(agent);
 
   if (ezcfg)
     ezcfg_del(ezcfg);
 
+  EZDBG("%s(%d) rc=[%d]\n", __func__, __LINE__, rc);
   return rc;
 }
 

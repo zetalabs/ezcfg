@@ -170,6 +170,7 @@ int agent_env_main(int argc, char **argv)
   while (*++argv)
     memset(*argv, 0, strlen(*argv));
 
+  DBG("<6>agent_env: init_conf=[%s]\n", init_conf);
   rc = ezcfg_api_agent_start(init_conf);
 
   /* should never run to this place!!! */

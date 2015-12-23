@@ -25,11 +25,19 @@
 
 #ifdef EZCFG_DEBUG
 #include <assert.h>
+#include <pthread.h>
+#include <sys/types.h>
+#include <sys/sysinfo.h>
+#include <unistd.h>
 #define ASSERT(exp) assert(exp)   
 #define EZDBG(format, args...) \
   do { \
+    struct sysinfo info;                            \
+    pthread_t tid = pthread_self();                 \
     FILE *ezdbg_fp = fopen("/tmp/ezdbg.log", "a");  \
+    sysinfo(&info);                                 \
     if (ezdbg_fp) {                                 \
+      fprintf(ezdbg_fp, "pid:%d tid:%ld uptime:%ld | ", getpid(), (long int)tid, info.uptime); \
       fprintf(ezdbg_fp, format, ## args);           \
       fclose(ezdbg_fp);                             \
     }                                               \
@@ -131,7 +139,7 @@
 
 /* thread config definitions */
 #define EZCFG_MASTER_SOCKET_QUEUE_LENGTH	20
-#define EZCFG_MASTER_WAIT_TIME	5
+#define EZCFG_MASTER_WAIT_TIME	1
 #define EZCFG_WORKER_WAIT_TIME	1
 
 /* ezcfg common definitions */
