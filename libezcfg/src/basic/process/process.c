@@ -24,6 +24,7 @@
 #include <errno.h>
 #include <ctype.h>
 #include <limits.h>
+#include <sys/ioctl.h>
 #include <sys/types.h>
 #include <sys/stat.h>
 #include <sys/wait.h>
@@ -51,295 +52,362 @@
 
 struct ezcfg_process {
   struct ezcfg *ezcfg;
-  int state;
   pid_t process_id; /* process's own pid */
+  char *command; /* process command */
+  int state; /* process state */
+  int force_stop; /* force to stop process in force_stop seconds */
 };
-
-/* mutex for thread_state manipulate */
-static pthread_mutex_t process_mutex = PTHREAD_MUTEX_INITIALIZER;
-
-//static struct ezcfg_process *this_process = NULL;
-//static struct ezcfg_process *parent_process = NULL;
-static struct ezcfg_linked_list *child_process_list = NULL;
 
 /**
  * private functions
  */
-static int lock_process_mutex(void)
+static char *get_pid_command(pid_t pid)
 {
-  int my_errno = 0;
-  int retry = 0;
-  while ((pthread_mutex_lock(&(process_mutex)) < 0) &&
-         (retry < EZCFG_LOCK_RETRY_MAX)) {
-    my_errno = errno;
-    EZDBG("%s(%d) pthread_mutex_lock() with errno=[%d]\n", __func__, __LINE__, my_errno);
-    if (my_errno == EINVAL) {
-      return EZCFG_RET_FAIL;
-    }
-    else {
-      EZDBG("%s(%d) wait a second then try again...\n", __func__, __LINE__);
-      sleep(1);
-      retry++;
-    }
+  FILE *fp = NULL;
+  char buf[256];
+  char *cmd = NULL;
+
+  snprintf(buf, sizeof(buf), "/proc/%d/cmdline", pid);
+  fp = fopen(buf, "r");
+  if (!fp) {
+    EZDBG("fopen %s failed\n", buf);
+    return NULL;
   }
-  if (retry < EZCFG_LOCK_RETRY_MAX) {
-    return EZCFG_RET_OK;
+  buf[0] = '\0';
+  cmd = fgets(buf, sizeof(buf), fp);
+  fclose(fp);
+  if (cmd == NULL) {
+    EZDBG("fgets failed errno=[%d]\n", errno);
+    return NULL;
   }
-  else {
-    return EZCFG_RET_FAIL;
+  cmd = strdup(buf);
+  if (cmd == NULL) {
+    EZDBG("strdup %s failed\n", buf);
   }
+  return cmd;
 }
 
-static int unlock_process_mutex(void)
+static int proc_has_no_process(struct ezcfg_process *process)
 {
-  int my_errno = 0;
-  int retry = 0;
-  while ((pthread_mutex_unlock(&(process_mutex)) < 0) &&
-         (retry < EZCFG_UNLOCK_RETRY_MAX)) {
-    my_errno = errno;
-    EZDBG("%s(%d) pthread_mutex_unlock() with errno=[%d]\n", __func__, __LINE__, my_errno);
-    if (my_errno == EINVAL) {
-      return EZCFG_RET_FAIL;
-    }
-    else {
-      EZDBG("%s(%d) wait a second then try again...\n", __func__, __LINE__);
-      sleep(1);
-      retry++;
-    }
-  }
-  if (retry < EZCFG_UNLOCK_RETRY_MAX) {
+  FILE *fp = NULL;
+  char buf[256];
+  char *cmd = NULL;
+
+  snprintf(buf, sizeof(buf), "/proc/%d/cmdline", process->process_id);
+  fp = fopen(buf, "r");
+  if (!fp) {
+    EZDBG("can not fopen %s\n", buf);
     return EZCFG_RET_OK;
   }
-  else {
+  buf[0] = '\0';
+  cmd = fgets(buf, sizeof(buf), fp);
+  fclose(fp);
+  if (cmd == NULL) {
+    EZDBG("fgets failed errno=[%d]\n", errno);
+    return EZCFG_RET_OK;
+  }
+  if (strcmp(buf, process->command) == 0) {
     return EZCFG_RET_FAIL;
   }
-}
-
-static int process_start(char *filename, char *initconf)
-{
-  char *new_argv[] = { filename, initconf, NULL };
-  char *new_env[] = { NULL };
-
-  return execve(filename, new_argv, new_env);
+  else {
+    return EZCFG_RET_OK;
+  }
 }
 
 /**
  * public functions
  */
-
-int ezcfg_process_new(struct ezcfg *ezcfg, char *ns)
+struct ezcfg_process *ezcfg_process_new(struct ezcfg *ezcfg, char *ns)
 {
   struct ezcfg_process *process = NULL;
-  pid_t cpid = -1;
-  int my_errno = 0;
-  char *child_filename = NULL;
-  char *child_initconf = NULL;
   char name[EZCFG_NAME_MAX] = "";
-  struct ezcfg_linked_list *list = NULL;
-  struct ezcfg_linked_list *new_list = NULL;
+  char *val = NULL;
   int ret = EZCFG_RET_FAIL;
-  struct ezcfg_nv_pair *data = NULL;
-  struct ezcfg_nv_pair *new_data = NULL;
-  int i = 0, list_length = 0;
-  int sub_ns_len = 0;
-  int meta_nvram_prefix_len = 0;
-  char *p_name = NULL;
-  char *p_value = NULL;
+  int i = 0;
+  int need_fork = 0;
+  int argc = 0;
+  char **argv = NULL;
+  int force_stop = 0;
+  int my_errno = 0;
+  int sig = 0;
+  int fd= -1;
 
   ASSERT (ezcfg != NULL);
+  ASSERT (ns != NULL);
 
   /* increase ezcfg library context reference */
   if (ezcfg_inc_ref(ezcfg) != EZCFG_RET_OK) {
     EZDBG("ezcfg_inc_ref() failed\n");
-    return EZCFG_RET_FAIL;
+    return NULL;
   }
 
-  meta_nvram_prefix_len = strlen(EZCFG_NVRAM_PREFIX_META);
-
-  /* build sub-namespace for process */
-  ret = ezcfg_util_snprintf_ns_name(name, sizeof(name), ns, EZCFG_NVRAM_PREFIX_PROCESS);
+  /* first check if it need to be forked */
+  ret = ezcfg_util_snprintf_ns_name(name, sizeof(name), ns, NVRAM_NAME(PROCESS, FORK));
   if (ret != EZCFG_RET_OK) {
-    goto exit_fail;
-  }
-  sub_ns_len = strlen(name);
-
-  ret = ezcfg_common_get_nvram_entries_by_ns(ezcfg, name, &list);
-  if (ret != EZCFG_RET_OK) {
-    goto exit_fail;
-  }
-
-  /* parse settings */
-  new_list = ezcfg_linked_list_new(ezcfg,
-    ezcfg_nv_pair_del_handler,
-    ezcfg_nv_pair_cmp_handler);
-  if (new_list == NULL) {
     EZDBG("%s(%d)\n", __func__, __LINE__);
     goto exit_fail;
   }
+  ret = ezcfg_common_get_nvram_entry_value(ezcfg, name, &val);
+  if (ret != EZCFG_RET_OK) {
+    EZDBG("%s(%d)\n", __func__, __LINE__);
+    goto exit_fail;
+  }
+  if (val) {
+    need_fork = atoi(val);
+    free(val);
+    val = NULL;
+  }
 
-  list_length = ezcfg_linked_list_get_length(list);
-  for (i = 1; i < list_length+1; i++) {
-    data = (struct ezcfg_nv_pair *)ezcfg_linked_list_get_node_data_by_index(list, i);
-    if (data == NULL) {
+  if (need_fork) {
+    /* prepare information for new process */
+    ret = ezcfg_util_snprintf_ns_name(name, sizeof(name), ns, NVRAM_NAME(PROCESS, ARGC));
+    if (ret != EZCFG_RET_OK) {
+      EZDBG("%s(%d)\n", __func__, __LINE__);
       goto exit_fail;
     }
-    p_name = ezcfg_nv_pair_get_n(data) + sub_ns_len;
-    if (strcmp(p_name, EZCFG_NVRAM_PROCESS_FILENAME) == 0) {
-      child_filename = strdup(ezcfg_nv_pair_get_v(data));
-      if (child_filename == NULL) {
-        goto exit_fail;
-      }
+    ret = ezcfg_common_get_nvram_entry_value(ezcfg, name, &val);
+    if (ret != EZCFG_RET_OK) {
+      EZDBG("%s(%d)\n", __func__, __LINE__);
+      goto exit_fail;
     }
-    else if (strncmp(p_name, EZCFG_NVRAM_PREFIX_META, meta_nvram_prefix_len) == 0) {
-      p_value = ezcfg_nv_pair_get_v(data);
-      data = NULL;
-      new_data = ezcfg_nv_pair_new(p_name, p_value);
-      if (new_data == NULL) {
+    if (val) {
+      argc = atoi(val);
+      free(val);
+      val = NULL;
+    }
+    if (argc < 1) {
+      EZDBG("%s(%d)\n", __func__, __LINE__);
+      goto exit_fail;
+    }
+    argv = (char **)calloc(argc+1, sizeof(char *));
+    if (argv == NULL) {
+      EZDBG("%s(%d)\n", __func__, __LINE__);
+      goto exit_fail;
+    }
+    for (i = 1; i <= argc; i++) {
+      snprintf(name, sizeof(name), "%s%s.%d", ns, NVRAM_NAME(PROCESS, ARGV), i);
+      ret = ezcfg_common_get_nvram_entry_value(ezcfg, name, &val);
+      if (ret != EZCFG_RET_OK) {
+        EZDBG("%s(%d)\n", __func__, __LINE__);
         goto exit_fail;
       }
-      if (ezcfg_linked_list_append(new_list, new_data) != EZCFG_RET_OK) {
-        goto exit_fail;
+      if (val) {
+        argv[i-1] = val;
+        val = NULL;
       }
-      new_data = NULL;
     }
   }
-  data = NULL;
 
-  /* build initconf for child process */
-  if (new_list) {
-    child_initconf = ezcfg_linked_list_nv_pair_to_json_text(new_list);
-    if (child_initconf == NULL) {
-      err(ezcfg, "ezcfg_linked_list_nv_pair_to_json_text() failed.\n");
-      goto exit_fail;
-    }
-    ezcfg_linked_list_del(new_list);
-    new_list = NULL;
+  ret = ezcfg_util_snprintf_ns_name(name, sizeof(name), ns, NVRAM_NAME(PROCESS, FORCE_STOP));
+  if (ret != EZCFG_RET_OK) {
+    EZDBG("%s(%d)\n", __func__, __LINE__);
+    goto exit_fail;
+  }
+  ret = ezcfg_common_get_nvram_entry_value(ezcfg, name, &val);
+  if (ret != EZCFG_RET_OK) {
+    EZDBG("%s(%d)\n", __func__, __LINE__);
+  }
+  if (val) {
+    force_stop = atoi(val);
+    free(val);
+    val = NULL;
   }
 
   process = (struct ezcfg_process *)calloc(1, sizeof(struct ezcfg_process));
   if (process == NULL) {
+    EZDBG("%s(%d)\n", __func__, __LINE__);
     err(ezcfg, "can not calloc process\n");
     goto exit_fail;
   }
 
-  cpid = fork();
-  if (cpid == -1) {
+  if (need_fork == 0) {
+    /* handle no fork case */
+    EZDBG("%s(%d)\n", __func__, __LINE__);
+    process->process_id = getpid();
+    process->command = get_pid_command(process->process_id);
+    if (process->command == NULL) {
+      EZDBG("%s(%d)\n", __func__, __LINE__);
+      err(ezcfg, "can not get process command\n");
+      goto exit_fail;
+    }
+    process->state = PROCESS_STATE_RUNNING;
+    process->force_stop = force_stop;
+    process->ezcfg = ezcfg;
+    return process;
+  }
+
+  /* handle fork case */
+  process->process_id = fork();
+  switch(process->process_id) {
+  case -1:
     /* it's in original process runtime space */
+    EZDBG("%s(%d)\n", __func__, __LINE__);
     my_errno = errno;
     err(ezcfg, "can not fork, errno=[%d]\n", my_errno);
     goto exit_fail;
-  }
 
-  if (cpid == 0) {
+  case 0:
     /* it's in child process runtime space */
     /* cleanup parent process resources */
-    pthread_mutex_init(&process_mutex, NULL);
-    child_process_list = NULL;
 
-    /* child process must stay in this block!!! */
-    return process_start(child_filename, child_initconf);
-  }
-  else {
+    /* reset signal handlers set from parent process */
+    for (sig = 0; sig < (_NSIG-1); sig++)
+      signal(sig, SIG_DFL);
+
+    /* clean up */
+    ioctl(0, TIOCNOTTY, 0);
+    close(STDIN_FILENO);
+    close(STDOUT_FILENO);
+    close(STDERR_FILENO);
+    setsid();
+
+    /* check if /dev/console is available */
+    if ((fd = open("/dev/console", O_RDWR)) < 0) {
+      (void) open("/dev/null", O_RDONLY);
+      (void) open("/dev/null", O_WRONLY);
+      (void) open("/dev/null", O_WRONLY);
+    }
+    else {
+      close(fd);
+      (void) open("/dev/console", O_RDONLY);
+      (void) open("/dev/console", O_WRONLY);
+      (void) open("/dev/console", O_WRONLY);
+    }
+
+    /* execute command */
+    setenv("PATH", "/sbin:/bin:/usr/sbin:/usr/bin", 1);
+    execvp(argv[0], argv);
+    perror(argv[0]);
+    exit(errno);
+
+  default:
     /* it's in parent process runtime space */
     /* cleanup unused variables */
-    if (child_filename) {
-      free(child_filename);
-      child_filename = NULL;
-    }
-    if (child_initconf) {
-      free(child_initconf);
-      child_initconf = NULL;
-    }
-    /* set child process info */
-    process->state = PROCESS_STATE_STOPPED;
-    process->process_id = cpid;
-    process->ezcfg = ezcfg;
-    /* add child process info to child_process_list */
-    if (lock_process_mutex() != EZCFG_RET_OK) {
-      EZDBG("lock_process_mutex() failed\n");
-      goto exit_fail;
-    }
-    if (child_process_list == NULL) {
-      child_process_list = ezcfg_linked_list_new(ezcfg,
-        ezcfg_process_del_handler,
-        ezcfg_process_cmp_handler);
-      if (child_process_list == NULL) {
-        EZDBG("%s(%d)\n", __func__, __LINE__);
-        if (unlock_process_mutex() != EZCFG_RET_OK) {
-          EZDBG("unlock_process_mutex() failed\n");
+    if (argv != NULL) {
+      process->command = argv[0];
+      argv[0] = NULL;
+      for (i = 1; i < argc; i++) {
+        if (argv[i] != NULL) {
+          free(argv[i]);
+          argv[i] = NULL;
         }
-        goto exit_fail;
       }
+      free(argv);
+      argv = NULL;
     }
-    if (ezcfg_linked_list_append(child_process_list, process) != EZCFG_RET_OK) {
-      EZDBG("%s(%d)\n", __func__, __LINE__);
-      if (unlock_process_mutex() != EZCFG_RET_OK) {
-        EZDBG("unlock_process_mutex() failed\n");
-      }
-      goto exit_fail;
-    }
-  }
 
-  EZDBG("%s(%d)\n", __func__, __LINE__);
-  return EZCFG_RET_OK;
+    /* set child process info */
+    process->state = PROCESS_STATE_RUNNING;
+    process->force_stop = force_stop;
+    process->ezcfg = ezcfg;
+    return process;
+  }
 
 exit_fail:
   EZDBG("%s(%d)\n", __func__, __LINE__);
-  if (child_filename) {
-    free(child_filename);
-  }
-  if (child_initconf) {
-    free(child_initconf);
-  }
-  if (data) {
-    ezcfg_nv_pair_del(data);
-  }
-  if (list) {
-    ezcfg_linked_list_del(list);
-  }
-  if (new_data) {
-    ezcfg_nv_pair_del(new_data);
-  }
-  if (new_list) {
-    ezcfg_linked_list_del(new_list);
+  if (argv != NULL) {
+    for (i = 0; i < argc; i++) {
+      if (argv[i] != NULL) {
+        free(argv[i]);
+        argv[i] = NULL;
+      }
+    }
+    free(argv);
+    argv = NULL;
   }
   if (process != NULL) {
+    if (process->command) {
+      free(process->command);
+      process->command = NULL;
+    }
     free(process);
+    process = NULL;
   }
   /* decrease ezcfg library context reference */
   if (ezcfg_dec_ref(ezcfg) != EZCFG_RET_OK) {
     EZDBG("ezcfg_dec_ref() failed\n");
   }
-  return EZCFG_RET_FAIL;
+  return process;
 }
 
 int ezcfg_process_del(struct ezcfg_process *process)
 {
+  struct ezcfg *ezcfg = NULL;
+
   ASSERT(process != NULL);
 
-  if (lock_process_mutex() != EZCFG_RET_OK) {
-    EZDBG("lock_thread_state_mutex() failed\n");
-    return EZCFG_RET_FAIL;
-  }
+  ezcfg = process->ezcfg;
 
   if (process->state != PROCESS_STATE_STOPPED) {
     EZDBG("process must stop first\n");
-    if (unlock_process_mutex() != EZCFG_RET_OK) {
-      EZDBG("unlock_process_mutex() failed\n");
-    }
     return EZCFG_RET_FAIL;
   }
 
-  /* cleanup child process list */
-  if (child_process_list) {
-    ezcfg_linked_list_del(child_process_list);
+  if (process->command) {
+    free(process->command);
+    process->command = NULL;
   }
-
   free(process);
-  if (unlock_process_mutex() != EZCFG_RET_OK) {
-    EZDBG("unlock_process_mutex() failed\n");
+
+  /* decrease ezcfg library context reference */
+  if (ezcfg_dec_ref(ezcfg) != EZCFG_RET_OK) {
+    EZDBG("ezcfg_dec_ref() failed\n");
   }
   return EZCFG_RET_OK;
+}
+
+int ezcfg_process_stop(struct ezcfg_process *process, int sig)
+{
+  int ret = EZCFG_RET_FAIL;
+  int i = 0;
+
+  ASSERT(process != NULL);
+
+  if (process->state == PROCESS_STATE_RUNNING) {
+    process->state = PROCESS_STATE_STOPPING;
+    if (kill(process->process_id, sig) < 0) {
+      return EZCFG_RET_FAIL;
+    }
+    sleep(1);
+  }
+
+  i = 0;
+  while (process->state != PROCESS_STATE_STOPPED) {
+    if (process->force_stop > 0) {
+      if (i == process->force_stop) {
+        kill(process->process_id, SIGKILL);
+        process->state = PROCESS_STATE_STOPPED;
+        return EZCFG_RET_OK;
+      }
+      i++;
+    }
+    sleep(1);
+    ret = proc_has_no_process(process);
+    if (ret == EZCFG_RET_OK) {
+      process->state = PROCESS_STATE_STOPPED;
+    }
+  }
+
+  return EZCFG_RET_OK;
+}
+
+int ezcfg_process_state_set_stopped(struct ezcfg_process *process)
+{
+  ASSERT(process != NULL);
+  process->state = PROCESS_STATE_STOPPED;
+  return EZCFG_RET_OK;
+}
+
+int ezcfg_process_state_is_stopped(struct ezcfg_process *process)
+{
+  ASSERT(process != NULL);
+
+  if (process->state == PROCESS_STATE_STOPPED) {
+    return EZCFG_RET_OK;
+  }
+  else {
+    return EZCFG_RET_FAIL;
+  }
 }
 
 int ezcfg_process_del_handler(void *data)
@@ -358,7 +426,12 @@ int ezcfg_process_cmp_handler(const void *d1, const void *d2)
 
   p1 = (struct ezcfg_process *)d1;
   p2 = (struct ezcfg_process *)d2;
-  if (p1->process_id == p2->process_id) {
+
+  ASSERT(p1->command != NULL);
+  ASSERT(p2->command != NULL);
+
+  if ((p1->process_id == p2->process_id) &&
+      (strcmp(p1->command, p2->command) == 0)) {
     return 0;
   }
   else {

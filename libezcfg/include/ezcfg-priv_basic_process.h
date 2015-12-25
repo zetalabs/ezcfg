@@ -17,8 +17,12 @@
 #include "ezcfg-types.h"
 
 /* basic/process/process.c */
-int ezcfg_process_new(struct ezcfg *ezcfg, char *ns);
+struct ezcfg_process *ezcfg_process_new(struct ezcfg *ezcfg, char *ns);
 int ezcfg_process_del(struct ezcfg_process *process);
+int ezcfg_process_stop(struct ezcfg_process *process, int sig);
+
+int ezcfg_process_state_set_stopped(struct ezcfg_process *process);
+int ezcfg_process_state_is_stopped(struct ezcfg_process *process);
 
 int ezcfg_process_del_handler(void *data);
 int ezcfg_process_cmp_handler(const void *d1, const void *d2);

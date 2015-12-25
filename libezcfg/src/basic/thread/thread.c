@@ -476,7 +476,7 @@ int ezcfg_thread_stop(struct ezcfg_thread *thread)
 
   EZDBG("%s(%d)\n", __func__, __LINE__);
   if (thread->state != THREAD_STATE_RUNNING) {
-    EZDBG("%s(%d) thread must be running\n", __func__, __LINE__);
+    EZDBG("%s(%d) thread is not running, do nothing.\n", __func__, __LINE__);
     ret = EZCFG_RET_FAIL;
     goto func_exit;
   }
@@ -489,9 +489,12 @@ int ezcfg_thread_stop(struct ezcfg_thread *thread)
     if (ret == EZCFG_RET_OK) {
       /* FIXME: thread->stop() makes thread->state = THREAD_STATE_STOPPING */
       /* now it should be STPPED */
+      EZDBG("%s(%d) thread->stop() OK, tag it stopped.\n", __func__, __LINE__);
       thread->state = THREAD_STATE_STOPPED;
+      ret = EZCFG_RET_OK;
     }
     else {
+      EZDBG("%s(%d) thread->stop() failed.\n", __func__, __LINE__);
       ret = EZCFG_RET_FAIL;
     }
   }

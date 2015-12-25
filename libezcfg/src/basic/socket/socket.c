@@ -195,6 +195,9 @@ static struct ezcfg_socket *create_socket(struct ezcfg *ezcfg,
     if (usa->u.sun.sun_path[0] == '@') {
       usa->u.sun.sun_path[0] = '\0';
     }
+    else {
+      sp->need_unlink = true;
+    }
     usa = &(sp->rsa);
     usa->u.sun.sun_family = AF_LOCAL;
     strcpy(usa->u.sun.sun_path, raddr);
@@ -821,43 +824,48 @@ struct ezcfg_socket *ezcfg_socket_new(struct ezcfg *ezcfg, char *ns)
     }
     if (ezcfg_nv_pair_get_n(data) == pdomain) {
       val = ezcfg_nv_pair_get_v(data);
+      data = NULL;
       if (val == NULL) {
         goto exit_fail;
       }
-      domain = atoi(val);
+      domain = ezcfg_util_socket_domain_get_index(val);
     }
     else if (ezcfg_nv_pair_get_n(data) == ptype) {
       val = ezcfg_nv_pair_get_v(data);
+      data = NULL;
       if (val == NULL) {
         goto exit_fail;
       }
-      type = atoi(val);
+      type = ezcfg_util_socket_type_get_index(val);
     }
     else if (ezcfg_nv_pair_get_n(data) == pproto) {
       val = ezcfg_nv_pair_get_v(data);
+      data = NULL;
       if (val == NULL) {
         goto exit_fail;
       }
-      proto = atoi(val);
+      proto = ezcfg_util_socket_protocol_get_index(val);
     }
     else if (ezcfg_nv_pair_get_n(data) == pladdr) {
       val = ezcfg_nv_pair_get_v(data);
-      if (*val != '\0') {
-        laddr = strdup(val);
-        if (laddr == NULL) {
-          data = NULL;
-          goto exit_fail;
-        }
+      data = NULL;
+      if (val == NULL) {
+        goto exit_fail;
+      }
+      laddr = strdup(val);
+      if (laddr == NULL) {
+        goto exit_fail;
       }
     }
     else if (ezcfg_nv_pair_get_n(data) == praddr) {
       val = ezcfg_nv_pair_get_v(data);
-      if (*val != '\0') {
-        raddr = strdup(val);
-        if (raddr == NULL) {
-          data = NULL;
-          goto exit_fail;
-        }
+      data = NULL;
+      if (val == NULL) {
+        goto exit_fail;
+      }
+      raddr = strdup(val);
+      if (raddr == NULL) {
+        goto exit_fail;
       }
     }
   }
@@ -868,10 +876,14 @@ struct ezcfg_socket *ezcfg_socket_new(struct ezcfg *ezcfg, char *ns)
   list = NULL;
 
   sp = create_socket(ezcfg, domain, type, proto, laddr, raddr, true);
-  free(laddr);
-  laddr = NULL;
-  free(raddr);
-  raddr = NULL;
+  if (laddr) {
+    free(laddr);
+    laddr = NULL;
+  }
+  if (raddr) {
+    free(raddr);
+    raddr = NULL;
+  }
   if (sp == NULL) {
     /* decrease ezcfg library context reference */
     if (ezcfg_dec_ref(ezcfg) != EZCFG_RET_OK) {

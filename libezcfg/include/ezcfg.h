@@ -137,17 +137,19 @@
 #define EZCFG_SSL_PRIV_ROOT_PATH	EZCFG_SSL_CONF_ROOT_PATH "/private"
 
 
-/* thread config definitions */
-#define EZCFG_MASTER_SOCKET_QUEUE_LENGTH	20
-#define EZCFG_MASTER_WAIT_TIME	1
-#define EZCFG_WORKER_WAIT_TIME	1
-
 /* ezcfg common definitions */
 #define EZCFG_COMMON_LOG_LEVEL_ERR_STRING     "err"
 #define EZCFG_COMMON_LOG_LEVEL_INFO_STRING    "info"
 #define EZCFG_COMMON_LOG_LEVEL_DEBUG_STRING   "debug"
 #define EZCFG_COMMON_DEFAULT_RULES_PATH       SYSCONFDIR "/ezcfg.rules"
 #define EZCFG_COMMON_DEFAULT_LOCALE_STRING    "zh_CN.UTF-8"
+
+
+/* agent config definitions */
+#define EZCFG_AGENT_SOCKET_QUEUE_LENGTH         20
+#define EZCFG_AGENT_MASTER_WAIT_TIME            1
+#define EZCFG_AGENT_WORKER_WAIT_TIME            1
+#define EZCFG_AGENT_WORKER_THREADS_MAX          10
 
 
 /* ezcfg file trailing charlist */

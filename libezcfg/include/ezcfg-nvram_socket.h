@@ -20,6 +20,7 @@
 #define EZCFG_NVRAM_PREFIX_SOCKET                "socket."
 
 /* ezcfg socket nvram names */
+#define EZCFG_NVRAM_SOCKET_NUMBER                "number"
 #define EZCFG_NVRAM_SOCKET_DOMAIN                "domain"
 #define EZCFG_NVRAM_SOCKET_TYPE                  "type"
 #define EZCFG_NVRAM_SOCKET_PROTOCOL              "protocol"

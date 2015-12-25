@@ -1,10 +1,11 @@
+/* -*- mode: C; c-file-style: "gnu"; indent-tabs-mode: nil; -*- */
 /* ============================================================================
  * Project Name : ezbox Configuration Daemon
  * Module Name  : util/util_snprintf_ns_name.c
  *
  * Description  : combine namespace with name
  *
- * Copyright (C) 2008-2015 by ezbox-project
+ * Copyright (C) 2008-2016 by ezbox-project
  *
  * History      Rev       Description
  * 2015-06-08   0.1       Write it from scratch

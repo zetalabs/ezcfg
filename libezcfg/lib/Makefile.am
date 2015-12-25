@@ -190,6 +190,7 @@ libezcfg_la_SOURCES += ../src/util/util_url.c
 libezcfg_la_SOURCES += ../src/util/util_wan.c
 libezcfg_la_SOURCES += ../src/util/util_mkdir.c
 libezcfg_la_SOURCES += ../src/util/util_snprintf_ns_name.c
+libezcfg_la_SOURCES += ../src/util/util_proc_check_pid.c
 if CONFIG_EZBOX_SERVICE_EZCFG_UPNPD
 # libezcfg_la_SOURCES += ../src/util/util_upnp_role.c
 # libezcfg_la_SOURCES += ../src/util/util_upnp_device_type.c

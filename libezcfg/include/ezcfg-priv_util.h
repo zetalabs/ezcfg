@@ -142,4 +142,8 @@ int ezcfg_util_mkdir(const char *path, mode_t mode, bool is_dir);
 /* util/util_snprintf_ns_name.c */
 int ezcfg_util_snprintf_ns_name(char *buf, size_t size, char *ns, char *name);
 
+/* util/util_proc_check_pid.c */
+int ezcfg_util_proc_check_pid(pid_t pid);
+int ezcfg_util_proc_check_no_pid(pid_t pid);
+
 #endif /* _EZCFG_PRIV_UTIL_H_ */

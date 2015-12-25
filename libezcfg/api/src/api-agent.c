@@ -154,7 +154,7 @@ int ezcfg_api_agent_start(char *init_conf)
   EZDBG("%s(%d)\n", __func__, __LINE__);
   while (ezcfg_socket_agent_is_stopped(agent) != EZCFG_RET_OK) {
     EZDBG("%s(%d)\n", __func__, __LINE__);
-    sleep(EZCFG_MASTER_WAIT_TIME);
+    sleep(EZCFG_AGENT_MASTER_WAIT_TIME);
   }
 
 func_out:

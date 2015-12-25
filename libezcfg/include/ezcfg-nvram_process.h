@@ -20,6 +20,10 @@
 #define EZCFG_NVRAM_PREFIX_PROCESS                "process."
 
 /* ezcfg socket nvram names */
-#define EZCFG_NVRAM_PROCESS_FILENAME              "filename"
+#define EZCFG_NVRAM_PROCESS_FORK                  "fork"
+#define EZCFG_NVRAM_PROCESS_ARGC                  "argc"
+#define EZCFG_NVRAM_PROCESS_ARGV                  "argv"
+#define EZCFG_NVRAM_PROCESS_FORCE_STOP            "force_stop"
+#define EZCFG_NVRAM_PROCESS_NUMBER                "number"
 
 #endif
