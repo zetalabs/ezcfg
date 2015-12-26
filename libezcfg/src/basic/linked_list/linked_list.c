@@ -340,6 +340,44 @@ void *ezcfg_linked_list_get_node_data_by_index(struct ezcfg_linked_list *list, i
   return np->data;
 }
 
+int ezcfg_linked_list_remove_node_data_by_index(struct ezcfg_linked_list *list, int i)
+{
+  struct linked_list_node *np = NULL;
+  struct linked_list_node *npp = NULL;
+
+  ASSERT(list != NULL);
+  ASSERT((i > 0) && (i <= list->length));
+
+  np = list->head;
+  i--;
+
+  while (i > 0) {
+    npp = np;
+    np = np->next;
+    i--;
+  }
+
+  /* remove the head node */
+  if (np == list->head) {
+    list->head = np->next;
+    if (np->next == NULL) {
+      list->tail = NULL;
+    }
+    linked_list_node_del(list, np);
+    list->length -= 1;
+    return EZCFG_RET_OK;
+  }
+
+  /* check if it's the tail node */
+  if (np->next == NULL) {
+    list->tail = npp;
+  }
+  npp->next = np->next;
+  linked_list_node_del(list, np);
+  list->length -= 1;
+  return EZCFG_RET_OK;
+}
+
 /* It's user's duty to free the returned string */
 char *ezcfg_linked_list_nv_pair_to_json_text(struct ezcfg_linked_list *list)
 {

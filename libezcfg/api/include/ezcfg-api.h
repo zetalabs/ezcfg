@@ -82,16 +82,18 @@ int ezcfg_api_arg_nvram_ssl_get_certificate_chain_file(struct ezcfg_arg_nvram_ss
 int ezcfg_api_arg_nvram_ssl_set_certificate_chain_file(struct ezcfg_arg_nvram_ssl *ap, const char *file);
 int ezcfg_api_arg_nvram_ssl_get_private_key_file(struct ezcfg_arg_nvram_ssl *ap, char **pp);
 int ezcfg_api_arg_nvram_ssl_set_private_key_file(struct ezcfg_arg_nvram_ssl *ap, const char *file);
+#endif
 
 /* NVRAM interface */
 int ezcfg_api_nvram_get(const char *name, char *value, size_t len);
 int ezcfg_api_nvram_set(const char *name, const char *value);
 int ezcfg_api_nvram_unset(const char *name);
+void ezcfg_api_nvram_set_debug(bool enable_debug);
+#if 0
 int ezcfg_api_nvram_set_multi(char *list, const int num);
 int ezcfg_api_nvram_list(char *list, size_t len);
 int ezcfg_api_nvram_info(char *list, size_t len);
 int ezcfg_api_nvram_commit(void);
-void ezcfg_api_nvram_set_debug(bool enable_debug);
 int ezcfg_api_nvram_insert_socket(struct ezcfg_arg_nvram_socket *ap);
 int ezcfg_api_nvram_remove_socket(struct ezcfg_arg_nvram_socket *ap);
 int ezcfg_api_nvram_insert_ssl(struct ezcfg_arg_nvram_ssl *ap);

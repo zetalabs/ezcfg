@@ -94,6 +94,9 @@ struct ezcfg_socket_agent {
   pthread_cond_t sq_full_cond;  /* Socket queue full condvar */
 };
 
+/* Private variables */
+static int child_process_changed = 0; /* flag for receiving SIGCHLD */
+
 /* Private functions */
 /*
  * only delete agent_new() allocated resources before pthread_mutex initialized
@@ -380,6 +383,8 @@ static int master_thread_arg_del(void *arg)
 static int master_thread_stop(void *arg)
 {
   struct ezcfg_socket_agent *agent = NULL;
+  struct timespec req;
+  struct timespec rem;
 
   ASSERT(arg != NULL);
 
@@ -389,7 +394,13 @@ static int master_thread_stop(void *arg)
   EZDBG("%s(%d)\n", __func__, __LINE__);
   while (agent->thread_stop == 0) {
     EZDBG("%s(%d)\n", __func__, __LINE__);
-    sleep(EZCFG_AGENT_MASTER_WAIT_TIME);
+    req.tv_sec = EZCFG_AGENT_MASTER_WAIT_TIME;
+    req.tv_nsec = 0;
+    if (nanosleep(&req, &rem) == -1) {
+      EZDBG("%s(%d) errno=[%d]\n", __func__, __LINE__, errno);
+      EZDBG("%s(%d) rem.tv_sec=[%ld]\n", __func__, __LINE__, (long)rem.tv_sec);
+      EZDBG("%s(%d) rem.tv_nsec=[%ld]\n", __func__, __LINE__, rem.tv_nsec);
+    }
     EZDBG("%s(%d)\n", __func__, __LINE__);
   }
 
@@ -496,6 +507,56 @@ static int agent_stop(struct ezcfg_socket_agent *agent)
   }
 }
 
+static int update_child_process_list(struct ezcfg_socket_agent *agent)
+{
+  struct ezcfg_process *process = NULL;
+  int list_length = 0;
+  int i = 0;
+  int ret = EZCFG_RET_FAIL;
+
+  /* lock mutex before handling child_process_list */
+  pthread_mutex_lock(&(agent->process_mutex));
+
+  if (agent->child_process_list) {
+    list_length = ezcfg_linked_list_get_length(agent->child_process_list);
+    for (i = 1; i < list_length+1; i++) {
+      EZDBG("%s(%d) i=[%d].\n", __func__, __LINE__, i);
+      process = (struct ezcfg_process *)ezcfg_linked_list_get_node_data_by_index(agent->child_process_list, i);
+      if (process == NULL) {
+        EZDBG("%s(%d)\n", __func__, __LINE__);
+        continue;
+      }
+      ret = ezcfg_process_proc_has_no_process(process);
+      if (ret == EZCFG_RET_OK) {
+        EZDBG("%s(%d) clean i=[%d]\n", __func__, __LINE__, i);
+        ret = ezcfg_process_state_set_stopped(process);
+        if (ret != EZCFG_RET_OK) {
+          EZDBG("%s(%d)\n", __func__, __LINE__);
+        }
+        ret = ezcfg_linked_list_remove_node_data_by_index(agent->child_process_list, i);
+        if (ret != EZCFG_RET_OK) {
+          EZDBG("%s(%d) remove i=[%d] error.\n", __func__, __LINE__, i);
+        }
+        EZDBG("%s(%d) clean done i=[%d]\n", __func__, __LINE__, i);
+      }
+    }
+  }
+
+  /* unlock mutex after handling child_process_list */
+  pthread_mutex_unlock(&(agent->process_mutex));
+  return EZCFG_RET_OK;
+}
+
+static void sigchld_handler(int sig, siginfo_t *si, void *unused)
+{
+  EZDBG("Got SIGCHLD at address: 0x%lx\n", (long) si->si_addr);
+  EZDBG("Got SIGCHLD from pid: %d\n", (int)si->si_pid);
+  EZDBG("Got SIGCHLD si_signo: %d\n", (int)si->si_signo);
+  EZDBG("Got SIGCHLD si_code: %d\n", (int)si->si_code);
+  EZDBG("Got SIGCHLD si_status: %d\n", (int)si->si_status);
+  child_process_changed = 1;
+}
+
 /********************/
 /* Public functions */
 /**
@@ -510,6 +571,7 @@ struct ezcfg_socket_agent *ezcfg_socket_agent_new(struct ezcfg *ezcfg)
   struct ezcfg_socket_agent *agent;
   int ret = EZCFG_RET_FAIL;
   char *val = NULL;
+  struct sigaction sa;
 
   ASSERT(ezcfg != NULL);
 
@@ -633,6 +695,7 @@ struct ezcfg_socket_agent *ezcfg_socket_agent_new(struct ezcfg *ezcfg)
   }
   agent->queue = ezcfg_socket_calloc(ezcfg, agent->sq_len);
   if (agent->queue == NULL) {
+    EZDBG("%s(%d)\n", __func__, __LINE__);
     err(ezcfg, "calloc socket queue.");
     goto fail_out;
   }
@@ -641,7 +704,27 @@ struct ezcfg_socket_agent *ezcfg_socket_agent_new(struct ezcfg *ezcfg)
    * ignore SIGPIPE signal, so if client cancels the request, it
    * won't kill the whole process.
    */
-  signal(SIGPIPE, SIG_IGN);
+  sa.sa_flags = 0;
+  sigemptyset(&sa.sa_mask);
+  sa.sa_handler = SIG_IGN;
+  sigaction(SIGPIPE, &sa, NULL);
+  if (sigaction(SIGPIPE, &sa, NULL) == -1) {
+    EZDBG("%s(%d)\n", __func__, __LINE__);
+    err(ezcfg, "sigaction(SIGPIPE).");
+    goto fail_out;
+  }
+
+  /*
+   * handle SIGCHLD signal, so if child process exit we can update child_process_list
+   */
+  sa.sa_flags = SA_SIGINFO;
+  sigemptyset(&sa.sa_mask);
+  sa.sa_sigaction = sigchld_handler;
+  if (sigaction(SIGCHLD, &sa, NULL) == -1) {
+    EZDBG("%s(%d)\n", __func__, __LINE__);
+    err(ezcfg, "sigaction(SIGCHLD).");
+    goto fail_out;
+  }
 
   /* initialize thread mutex */
   pthread_mutex_init(&(agent->process_mutex), NULL);
@@ -717,6 +800,9 @@ int ezcfg_socket_agent_start(struct ezcfg_socket_agent *agent)
   char name[EZCFG_NAME_MAX];
   int sock_num = 0;
   int i = 0;
+  struct ezcfg_process *child_process = NULL;
+  char cp_ns[EZCFG_NAME_MAX];
+  int child_number = 0;
 
   ASSERT(agent != NULL);
 
@@ -815,12 +901,6 @@ int ezcfg_socket_agent_start(struct ezcfg_socket_agent *agent)
   EZDBG("%s(%d)\n", __func__, __LINE__);
   ret = ezcfg_common_get_nvram_entry_value(ezcfg, NVRAM_NAME(AGENT, CHILD_PROCESS_NAMESPACE), &val);
   if (ret == EZCFG_RET_OK) {
-    struct ezcfg_process *child_process = NULL;
-    char cp_ns[EZCFG_NAME_MAX];
-    char name[EZCFG_NAME_MAX];
-    int child_number = 0;
-    int i = 0;
-
     /* get child process namespace */
     EZDBG("%s(%d)\n", __func__, __LINE__);
     snprintf(cp_ns, sizeof(cp_ns), "%s", val);
@@ -954,4 +1034,31 @@ int ezcfg_socket_agent_is_stopped(struct ezcfg_socket_agent *agent)
   else {
     return EZCFG_RET_FAIL;
   }
+}
+
+int ezcfg_socket_agent_main_loop(struct ezcfg_socket_agent *agent)
+{
+  struct timespec req;
+  struct timespec rem;
+
+  ASSERT(agent != NULL);
+
+  EZDBG("%s(%d)\n", __func__, __LINE__);
+  while (agent->state != AGENT_STATE_STOPPED) {
+    EZDBG("%s(%d)\n", __func__, __LINE__);
+    req.tv_sec = EZCFG_AGENT_MASTER_WAIT_TIME;
+    req.tv_nsec = 0;
+    if (nanosleep(&req, &rem) == -1) {
+      EZDBG("%s(%d) errno=[%d]\n", __func__, __LINE__, errno);
+      EZDBG("%s(%d) rem.tv_sec=[%ld]\n", __func__, __LINE__, (long)rem.tv_sec);
+      EZDBG("%s(%d) rem.tv_nsec=[%ld]\n", __func__, __LINE__, rem.tv_nsec);
+    }
+    EZDBG("%s(%d)\n", __func__, __LINE__);
+    if (child_process_changed) {
+      child_process_changed = 0;
+      update_child_process_list(agent);
+    }
+  }
+
+  return EZCFG_RET_OK;
 }

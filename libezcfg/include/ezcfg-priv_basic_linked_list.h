@@ -30,7 +30,10 @@ void *ezcfg_linked_list_take_data(struct ezcfg_linked_list *list);
 int ezcfg_linked_list_remove(struct ezcfg_linked_list *list, void *data);
 int ezcfg_linked_list_in(struct ezcfg_linked_list *list, void *data);
 int ezcfg_linked_list_get_length(struct ezcfg_linked_list *list);
+
 void *ezcfg_linked_list_get_node_data_by_index(struct ezcfg_linked_list *list, int i);
+int ezcfg_linked_list_remove_node_data_by_index(struct ezcfg_linked_list *list, int i);
+
 char *ezcfg_linked_list_nv_pair_to_json_text(struct ezcfg_linked_list *list);
 
 #endif /* _EZCFG_PRIV_BASIC_LINKED_LIST_H_ */

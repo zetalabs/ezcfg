@@ -131,6 +131,7 @@ struct ezcfg_process *ezcfg_process_new(struct ezcfg *ezcfg, char *ns)
   int my_errno = 0;
   int sig = 0;
   int fd= -1;
+  struct sigaction sa;
 
   ASSERT (ezcfg != NULL);
   ASSERT (ns != NULL);
@@ -233,6 +234,7 @@ struct ezcfg_process *ezcfg_process_new(struct ezcfg *ezcfg, char *ns)
     process->state = PROCESS_STATE_RUNNING;
     process->force_stop = force_stop;
     process->ezcfg = ezcfg;
+    EZDBG("%s(%d) pid=[%d] cmd=[%s]\n", __func__, __LINE__, process->process_id, process->command);
     return process;
   }
 
@@ -251,8 +253,16 @@ struct ezcfg_process *ezcfg_process_new(struct ezcfg *ezcfg, char *ns)
     /* cleanup parent process resources */
 
     /* reset signal handlers set from parent process */
-    for (sig = 0; sig < (_NSIG-1); sig++)
-      signal(sig, SIG_DFL);
+    sa.sa_flags = 0;
+    sigemptyset(&sa.sa_mask);
+    sa.sa_handler = SIG_DFL;
+    for (sig = 0; sig < (_NSIG-1); sig++) {
+      if ((sig == SIGKILL) ||(sig == SIGSTOP))
+        continue;
+      if (sigaction(sig, &sa, NULL) == -1) {
+        EZDBG("%s(%d) sigaction(%d) error.\n", __func__, __LINE__, sig);
+      }
+    }
 
     /* clean up */
     ioctl(0, TIOCNOTTY, 0);
@@ -300,6 +310,7 @@ struct ezcfg_process *ezcfg_process_new(struct ezcfg *ezcfg, char *ns)
     process->state = PROCESS_STATE_RUNNING;
     process->force_stop = force_stop;
     process->ezcfg = ezcfg;
+    EZDBG("%s(%d) child pid=[%d] cmd=[%s]\n", __func__, __LINE__, process->process_id, process->command);
     return process;
   }
 
@@ -360,6 +371,8 @@ int ezcfg_process_stop(struct ezcfg_process *process, int sig)
 {
   int ret = EZCFG_RET_FAIL;
   int i = 0;
+  struct timespec req;
+  struct timespec rem;
 
   ASSERT(process != NULL);
 
@@ -368,7 +381,14 @@ int ezcfg_process_stop(struct ezcfg_process *process, int sig)
     if (kill(process->process_id, sig) < 0) {
       return EZCFG_RET_FAIL;
     }
-    sleep(1);
+    /* sleep 500 ms */
+    req.tv_sec = 0;
+    req.tv_nsec = 500000000;
+    if (nanosleep(&req, &rem) == -1) {
+      EZDBG("%s(%d) errno=[%d]\n", __func__, __LINE__, errno);
+      EZDBG("%s(%d) rem.tv_sec=[%ld]\n", __func__, __LINE__, (long)rem.tv_sec);
+      EZDBG("%s(%d) rem.tv_nsec=[%ld]\n", __func__, __LINE__, rem.tv_nsec);
+    }
   }
 
   i = 0;
@@ -381,7 +401,14 @@ int ezcfg_process_stop(struct ezcfg_process *process, int sig)
       }
       i++;
     }
-    sleep(1);
+    /* sleep 500 ms */
+    req.tv_sec = 0;
+    req.tv_nsec = 500000000;
+    if (nanosleep(&req, &rem) == -1) {
+      EZDBG("%s(%d) errno=[%d]\n", __func__, __LINE__, errno);
+      EZDBG("%s(%d) rem.tv_sec=[%ld]\n", __func__, __LINE__, (long)rem.tv_sec);
+      EZDBG("%s(%d) rem.tv_nsec=[%ld]\n", __func__, __LINE__, rem.tv_nsec);
+    }
     ret = proc_has_no_process(process);
     if (ret == EZCFG_RET_OK) {
       process->state = PROCESS_STATE_STOPPED;
@@ -389,6 +416,12 @@ int ezcfg_process_stop(struct ezcfg_process *process, int sig)
   }
 
   return EZCFG_RET_OK;
+}
+
+int ezcfg_process_proc_has_no_process(struct ezcfg_process *process)
+{
+  ASSERT(process != NULL);
+  return proc_has_no_process(process);
 }
 
 int ezcfg_process_state_set_stopped(struct ezcfg_process *process)

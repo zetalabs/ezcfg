@@ -23,6 +23,7 @@ int ezcfg_process_stop(struct ezcfg_process *process, int sig);
 
 int ezcfg_process_state_set_stopped(struct ezcfg_process *process);
 int ezcfg_process_state_is_stopped(struct ezcfg_process *process);
+int ezcfg_process_proc_has_no_process(struct ezcfg_process *process);
 
 int ezcfg_process_del_handler(void *data);
 int ezcfg_process_cmp_handler(const void *d1, const void *d2);

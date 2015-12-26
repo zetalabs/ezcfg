@@ -152,10 +152,7 @@ int ezcfg_api_agent_start(char *init_conf)
 
   /* It should not return until master_thread stopped */
   EZDBG("%s(%d)\n", __func__, __LINE__);
-  while (ezcfg_socket_agent_is_stopped(agent) != EZCFG_RET_OK) {
-    EZDBG("%s(%d)\n", __func__, __LINE__);
-    sleep(EZCFG_AGENT_MASTER_WAIT_TIME);
-  }
+  ezcfg_socket_agent_main_loop(agent);
 
 func_out:
   EZDBG("%s(%d)\n", __func__, __LINE__);
