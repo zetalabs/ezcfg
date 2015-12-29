@@ -80,6 +80,10 @@ void ezcfg_util_url_remove_double_dots_and_double_slashes(char *s);
 int ezcfg_util_socket_protocol_get_index(char *name);
 bool ezcfg_util_socket_is_supported_protocol(const int proto);
 
+/* util/util_socket_role.c */
+int ezcfg_util_socket_role_get_index(char *name);
+bool ezcfg_util_socket_is_supported_role(const int role);
+
 /* util/util_socket_domain.c */
 int ezcfg_util_socket_domain_get_index(char *name);
 bool ezcfg_util_socket_is_supported_domain(const int domain);

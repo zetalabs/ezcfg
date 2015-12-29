@@ -21,7 +21,7 @@
 int ezcfg_socket_del(struct ezcfg_socket *sp);
 struct ezcfg_socket *ezcfg_socket_new(struct ezcfg *ezcfg, char *ns);
 struct ezcfg_socket *ezcfg_socket_fake_new(struct ezcfg *ezcfg,
-  const int family, const int type, const int proto,
+  const int family, const int type, const int proto, const int role,
   const char *laddr, const char *raddr);
 struct ezcfg_socket *ezcfg_socket_calloc(struct ezcfg *ezcfg, int size);
 struct ezcfg_socket *ezcfg_socket_new_accepted_socket(const struct ezcfg_socket *listener);
@@ -70,6 +70,8 @@ bool ezcfg_socket_sync_rsa(struct ezcfg_socket *dsp, const struct ezcfg_socket *
 int ezcfg_socket_connect_remote(struct ezcfg_socket *sp);
 int ezcfg_socket_read(struct ezcfg_socket *sp, void *buf, int len, int flags);
 int ezcfg_socket_write(struct ezcfg_socket *sp, const void *buf, int len, int flags);
+int ezcfg_socket_role_is_server(struct ezcfg_socket *sp);
+int ezcfg_socket_role_is_client(struct ezcfg_socket *sp);
 
 /* socket/socket_http.c */
 int ezcfg_socket_read_http_header(struct ezcfg_socket *sp, struct ezcfg_http *http, char *buf, int bufsiz, int *nread);

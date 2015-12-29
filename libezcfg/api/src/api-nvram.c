@@ -44,9 +44,11 @@
 
 #include "ezcfg.h"
 #include "ezcfg-private.h"
-#include "ezcfg-nv_json_http_socket.h"
+//#include "ezcfg-nv_json_http_socket.h"
 
 #include "ezcfg-api.h"
+
+#define EZCFG_NV_JSON_HTTP_URI                   "/ezcfg/nv_json"
 
 static bool debug = false;
 static int
@@ -789,7 +791,7 @@ int ezcfg_api_nvram_change(char *init_conf, char *ns, char *nv_json, char **pres
   char *msg = NULL;
   int msg_len;
   struct ezcfg *ezcfg = NULL;
-  struct ezcfg_json_http *jh = NULL;
+  struct ezcfg_nv_json_http *njh = NULL;
   struct ezcfg_http *http = NULL;
   struct ezcfg_json *json = NULL;
   struct ezcfg_socket *sp = NULL;
@@ -815,14 +817,14 @@ int ezcfg_api_nvram_change(char *init_conf, char *ns, char *nv_json, char **pres
   ezcfg_common_set_log_func(ezcfg, log_func);
 
   /* setup JSON/HTTP handler */
-  jh = ezcfg_json_http_new(ezcfg);
-  if (jh == NULL) {
+  njh = ezcfg_nv_json_http_new(ezcfg);
+  if (njh == NULL) {
     rc = -EZCFG_E_RESOURCE ;
     goto func_exit;
   }
 
-  json = ezcfg_json_http_get_json(jh);
-  http = ezcfg_json_http_get_http(jh);
+  json = ezcfg_nv_json_http_get_json(njh);
+  http = ezcfg_nv_json_http_get_http(njh);
 
   /* check nv_json format */
   if (ezcfg_json_parse_text(json, nv_json, strlen(nv_json)) != EZCFG_RET_OK) {
@@ -874,7 +876,7 @@ int ezcfg_api_nvram_change(char *init_conf, char *ns, char *nv_json, char **pres
   }
   msg = p;
   msg[msg_len] = '\0';
-  if (ezcfg_json_http_write_message(jh, msg, msg_len) != msg_len) {
+  if (ezcfg_nv_json_http_write_message(njh, msg, msg_len) != msg_len) {
     rc = -EZCFG_E_WRITE ;
     goto func_exit;
   }
@@ -904,7 +906,7 @@ int ezcfg_api_nvram_change(char *init_conf, char *ns, char *nv_json, char **pres
     goto func_exit;
   }
 
-  ezcfg_json_http_reset_attributes(jh);
+  ezcfg_nv_json_http_reset_attributes(njh);
 
   n = 0;
   header_len = ezcfg_socket_read_http_header(sp, http, msg, msg_len, &n);
@@ -915,7 +917,7 @@ int ezcfg_api_nvram_change(char *init_conf, char *ns, char *nv_json, char **pres
   }
 
   ezcfg_http_set_state_response(http);
-  if (ezcfg_json_http_parse_header(jh, msg, header_len) == false) {
+  if (ezcfg_nv_json_http_parse_header(njh, msg, header_len) == false) {
     rc = -EZCFG_E_PARSE ;
     goto func_exit;
   }
@@ -927,14 +929,14 @@ int ezcfg_api_nvram_change(char *init_conf, char *ns, char *nv_json, char **pres
     goto func_exit;
   }
   if (n > header_len) {
-    ezcfg_json_http_set_message_body(jh, msg + header_len, n - header_len);
-    if (ezcfg_json_http_parse_message_body(jh) == false) {
+    ezcfg_nv_json_http_set_message_body(njh, msg + header_len, n - header_len);
+    if (ezcfg_nv_json_http_parse_message_body(njh) == false) {
       rc = -EZCFG_E_PARSE ;
       goto func_exit;
     }
   }
 
-  json = ezcfg_json_http_get_json(jh);
+  json = ezcfg_nv_json_http_get_json(njh);
   if (ezcfg_json_is_nvram_representation(json) == false) {
     rc = -EZCFG_E_PARSE ;
     goto func_exit;
@@ -964,8 +966,8 @@ func_exit:
     free(msg);
   }
 
-  if (jh != NULL) {
-    ezcfg_json_http_del(jh);
+  if (njh != NULL) {
+    ezcfg_nv_json_http_del(njh);
   }
 
   if (sp != NULL) {

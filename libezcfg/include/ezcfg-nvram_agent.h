@@ -36,5 +36,7 @@
 	"socket_namespace"
 #define EZCFG_NVRAM_AGENT_CHILD_PROCESS_NAMESPACE \
 	"child_process_namespace"
+#define EZCFG_NVRAM_AGENT_ENVIRONMENT_NAMESPACE \
+	"environment_namespace"
 
 #endif

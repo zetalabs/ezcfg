@@ -81,8 +81,9 @@ struct ezcfg_socket {
   struct ezcfg *ezcfg;
   struct ezcfg_socket *next;      /* Linkage                      */
   int                  sock;      /* Listening socket             */
-  int                  proto;     /* Communication protocol 	*/
-  int                  backlog;   /* Listening queue length 	*/
+  int                  proto;     /* Communication protocol       */
+  int                  role;      /* Communication role           */
+  int                  backlog;   /* Listening queue length       */
   int                  domain;
   int                  type;
   struct usa           lsa;       /* Local socket address         */
@@ -134,7 +135,7 @@ static void close_socket_gracefully(int sock) {
  * Returns: a new ezcfg socket
  **/
 static struct ezcfg_socket *create_socket(struct ezcfg *ezcfg,
-  const int domain, const int type, const int proto,
+  const int domain, const int type, const int proto, const int role,
   const char *laddr, const char *raddr, bool create_sockfd)
 {
   struct ezcfg_socket *sp = NULL;
@@ -157,6 +158,11 @@ static struct ezcfg_socket *create_socket(struct ezcfg *ezcfg,
     return NULL;
   }
 
+  if (ezcfg_util_socket_is_supported_role(role) == false) {
+    err(ezcfg, "unknown communication role %d\n", role);
+    return NULL;
+  }
+
   /* initialize socket */
   if ((sp = calloc(1, sizeof(struct ezcfg_socket))) == NULL) {
     err(ezcfg, "calloc socket fail: %m\n");
@@ -168,6 +174,7 @@ static struct ezcfg_socket *create_socket(struct ezcfg *ezcfg,
   sp->proto = proto;
   sp->domain = domain;
   sp->type = type;
+  sp->role = role;
 
   /* FIXME: should change sock_protocol w/r proto */
   if (proto == EZCFG_PROTO_UEVENT) {
@@ -706,8 +713,8 @@ int ezcfg_socket_del(struct ezcfg_socket *sp)
  **/
 struct ezcfg_socket *ezcfg_socket_new(struct ezcfg *ezcfg, char *ns)
 {
-  int domain = -1, type = -1, proto = -1;
-  char *pdomain, *ptype, *pproto, *pladdr, *praddr;
+  int domain = -1, type = -1, proto = -1, role = -1;
+  char *pdomain, *ptype, *pproto, *pladdr, *praddr, *prole;
   char *laddr = NULL;
   char *raddr = NULL;
   char name[EZCFG_NAME_MAX] = "";
@@ -737,13 +744,16 @@ struct ezcfg_socket *ezcfg_socket_new(struct ezcfg *ezcfg, char *ns)
   /* domain */
   ret = ezcfg_util_snprintf_ns_name(name, sizeof(name), ns, NVRAM_NAME(SOCKET, DOMAIN));
   if (ret != EZCFG_RET_OK) {
+    EZDBG("%s(%d)\n", __func__, __LINE__);
     goto exit_fail;
   }
   data = ezcfg_nv_pair_new(name, NULL);
   if (data == NULL) {
+    EZDBG("%s(%d)\n", __func__, __LINE__);
     goto exit_fail;
   }
   if (ezcfg_linked_list_append(list, data) != EZCFG_RET_OK) {
+    EZDBG("%s(%d)\n", __func__, __LINE__);
     goto exit_fail;
   }
   pdomain = ezcfg_nv_pair_get_n(data);
@@ -752,13 +762,16 @@ struct ezcfg_socket *ezcfg_socket_new(struct ezcfg *ezcfg, char *ns)
   /* type */
   ret = ezcfg_util_snprintf_ns_name(name, sizeof(name), ns, NVRAM_NAME(SOCKET, TYPE));
   if (ret != EZCFG_RET_OK) {
+    EZDBG("%s(%d)\n", __func__, __LINE__);
     goto exit_fail;
   }
   data = ezcfg_nv_pair_new(name, NULL);
   if (data == NULL) {
+    EZDBG("%s(%d)\n", __func__, __LINE__);
     goto exit_fail;
   }
   if (ezcfg_linked_list_append(list, data) != EZCFG_RET_OK) {
+    EZDBG("%s(%d)\n", __func__, __LINE__);
     goto exit_fail;
   }
   ptype = ezcfg_nv_pair_get_n(data);
@@ -767,28 +780,52 @@ struct ezcfg_socket *ezcfg_socket_new(struct ezcfg *ezcfg, char *ns)
   /* protocol */
   ret = ezcfg_util_snprintf_ns_name(name, sizeof(name), ns, NVRAM_NAME(SOCKET, PROTOCOL));
   if (ret != EZCFG_RET_OK) {
+    EZDBG("%s(%d)\n", __func__, __LINE__);
     goto exit_fail;
   }
   data = ezcfg_nv_pair_new(name, NULL);
   if (data == NULL) {
+    EZDBG("%s(%d)\n", __func__, __LINE__);
     goto exit_fail;
   }
   if (ezcfg_linked_list_append(list, data) != EZCFG_RET_OK) {
+    EZDBG("%s(%d)\n", __func__, __LINE__);
     goto exit_fail;
   }
   pproto = ezcfg_nv_pair_get_n(data);
   data = NULL;
 
-  /* local address */
-  ret = ezcfg_util_snprintf_ns_name(name, sizeof(name), ns, NVRAM_NAME(SOCKET, LOCAL_ADDRESS));
+  /* role */
+  ret = ezcfg_util_snprintf_ns_name(name, sizeof(name), ns, NVRAM_NAME(SOCKET, ROLE));
   if (ret != EZCFG_RET_OK) {
+    EZDBG("%s(%d)\n", __func__, __LINE__);
     goto exit_fail;
   }
   data = ezcfg_nv_pair_new(name, NULL);
   if (data == NULL) {
+    EZDBG("%s(%d)\n", __func__, __LINE__);
     goto exit_fail;
   }
   if (ezcfg_linked_list_append(list, data) != EZCFG_RET_OK) {
+    EZDBG("%s(%d)\n", __func__, __LINE__);
+    goto exit_fail;
+  }
+  prole = ezcfg_nv_pair_get_n(data);
+  data = NULL;
+
+  /* local address */
+  ret = ezcfg_util_snprintf_ns_name(name, sizeof(name), ns, NVRAM_NAME(SOCKET, LOCAL_ADDRESS));
+  if (ret != EZCFG_RET_OK) {
+    EZDBG("%s(%d)\n", __func__, __LINE__);
+    goto exit_fail;
+  }
+  data = ezcfg_nv_pair_new(name, NULL);
+  if (data == NULL) {
+    EZDBG("%s(%d)\n", __func__, __LINE__);
+    goto exit_fail;
+  }
+  if (ezcfg_linked_list_append(list, data) != EZCFG_RET_OK) {
+    EZDBG("%s(%d)\n", __func__, __LINE__);
     goto exit_fail;
   }
   pladdr = ezcfg_nv_pair_get_n(data);
@@ -797,13 +834,16 @@ struct ezcfg_socket *ezcfg_socket_new(struct ezcfg *ezcfg, char *ns)
   /* remote address */
   ret = ezcfg_util_snprintf_ns_name(name, sizeof(name), ns, NVRAM_NAME(SOCKET, REMOTE_ADDRESS));
   if (ret != EZCFG_RET_OK) {
+    EZDBG("%s(%d)\n", __func__, __LINE__);
     goto exit_fail;
   }
   data = ezcfg_nv_pair_new(name, NULL);
   if (data == NULL) {
+    EZDBG("%s(%d)\n", __func__, __LINE__);
     goto exit_fail;
   }
   if (ezcfg_linked_list_append(list, data) != EZCFG_RET_OK) {
+    EZDBG("%s(%d)\n", __func__, __LINE__);
     goto exit_fail;
   }
   praddr = ezcfg_nv_pair_get_n(data);
@@ -812,6 +852,7 @@ struct ezcfg_socket *ezcfg_socket_new(struct ezcfg *ezcfg, char *ns)
   /* get these value from nvram */
   ret = ezcfg_common_get_nvram_entries(ezcfg, list);
   if (ret != EZCFG_RET_OK) {
+    EZDBG("%s(%d)\n", __func__, __LINE__);
     goto exit_fail;
   }
 
@@ -820,12 +861,14 @@ struct ezcfg_socket *ezcfg_socket_new(struct ezcfg *ezcfg, char *ns)
   for (i = 1; i < list_length+1; i++) {
     data = (struct ezcfg_nv_pair *)ezcfg_linked_list_get_node_data_by_index(list, i);
     if (data == NULL) {
+      EZDBG("%s(%d)\n", __func__, __LINE__);
       goto exit_fail;
     }
     if (ezcfg_nv_pair_get_n(data) == pdomain) {
       val = ezcfg_nv_pair_get_v(data);
       data = NULL;
       if (val == NULL) {
+        EZDBG("%s(%d)\n", __func__, __LINE__);
         goto exit_fail;
       }
       domain = ezcfg_util_socket_domain_get_index(val);
@@ -834,6 +877,7 @@ struct ezcfg_socket *ezcfg_socket_new(struct ezcfg *ezcfg, char *ns)
       val = ezcfg_nv_pair_get_v(data);
       data = NULL;
       if (val == NULL) {
+        EZDBG("%s(%d)\n", __func__, __LINE__);
         goto exit_fail;
       }
       type = ezcfg_util_socket_type_get_index(val);
@@ -842,18 +886,30 @@ struct ezcfg_socket *ezcfg_socket_new(struct ezcfg *ezcfg, char *ns)
       val = ezcfg_nv_pair_get_v(data);
       data = NULL;
       if (val == NULL) {
+        EZDBG("%s(%d)\n", __func__, __LINE__);
         goto exit_fail;
       }
       proto = ezcfg_util_socket_protocol_get_index(val);
+    }
+    else if (ezcfg_nv_pair_get_n(data) == prole) {
+      val = ezcfg_nv_pair_get_v(data);
+      data = NULL;
+      if (val == NULL) {
+        EZDBG("%s(%d)\n", __func__, __LINE__);
+        goto exit_fail;
+      }
+      role = ezcfg_util_socket_role_get_index(val);
     }
     else if (ezcfg_nv_pair_get_n(data) == pladdr) {
       val = ezcfg_nv_pair_get_v(data);
       data = NULL;
       if (val == NULL) {
+        EZDBG("%s(%d)\n", __func__, __LINE__);
         goto exit_fail;
       }
       laddr = strdup(val);
       if (laddr == NULL) {
+        EZDBG("%s(%d)\n", __func__, __LINE__);
         goto exit_fail;
       }
     }
@@ -861,10 +917,12 @@ struct ezcfg_socket *ezcfg_socket_new(struct ezcfg *ezcfg, char *ns)
       val = ezcfg_nv_pair_get_v(data);
       data = NULL;
       if (val == NULL) {
+        EZDBG("%s(%d)\n", __func__, __LINE__);
         goto exit_fail;
       }
       raddr = strdup(val);
       if (raddr == NULL) {
+        EZDBG("%s(%d)\n", __func__, __LINE__);
         goto exit_fail;
       }
     }
@@ -875,7 +933,7 @@ struct ezcfg_socket *ezcfg_socket_new(struct ezcfg *ezcfg, char *ns)
   ezcfg_linked_list_del(list);
   list = NULL;
 
-  sp = create_socket(ezcfg, domain, type, proto, laddr, raddr, true);
+  sp = create_socket(ezcfg, domain, type, proto, role, laddr, raddr, true);
   if (laddr) {
     free(laddr);
     laddr = NULL;
@@ -885,6 +943,7 @@ struct ezcfg_socket *ezcfg_socket_new(struct ezcfg *ezcfg, char *ns)
     raddr = NULL;
   }
   if (sp == NULL) {
+    EZDBG("%s(%d)\n", __func__, __LINE__);
     /* decrease ezcfg library context reference */
     if (ezcfg_dec_ref(ezcfg) != EZCFG_RET_OK) {
       EZDBG("%s(%d) <6>pid=[%d] ezcfg_dec_ref() failed\n", __func__, __LINE__, getpid());
@@ -919,10 +978,10 @@ exit_fail:
  * Returns: a new ezcfg socket
  **/
 struct ezcfg_socket *ezcfg_socket_fake_new(struct ezcfg *ezcfg,
-   const int domain, const int type, const int proto,
+   const int domain, const int type, const int proto, const int role,
    const char *laddr, const char *raddr)
 {
-  return create_socket(ezcfg, domain, type, proto, laddr, raddr, false);
+  return create_socket(ezcfg, domain, type, proto, role, laddr, raddr, false);
 }
 
 struct ezcfg *ezcfg_socket_get_ezcfg(const struct ezcfg_socket *sp)
@@ -1974,4 +2033,28 @@ int ezcfg_socket_write(struct ezcfg_socket *sp, const void *buf, int len, int fl
   }
 
   return status;
+}
+
+int ezcfg_socket_role_is_server(struct ezcfg_socket *sp)
+{
+  ASSERT(sp != NULL);
+
+  if (sp->role == EZCFG_SOCKET_ROLE_SERVER) {
+    return EZCFG_RET_OK;
+  }
+  else {
+    return EZCFG_RET_FAIL;
+  }
+}
+
+int ezcfg_socket_role_is_client(struct ezcfg_socket *sp)
+{
+  ASSERT(sp != NULL);
+
+  if (sp->role == EZCFG_SOCKET_ROLE_CLIENT) {
+    return EZCFG_RET_OK;
+  }
+  else {
+    return EZCFG_RET_FAIL;
+  }
 }

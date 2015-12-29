@@ -19,6 +19,7 @@
 struct ezcfg_nv_linked_list;
 struct ezcfg_nv_linked_list *ezcfg_nv_linked_list_new(struct ezcfg *ezcfg);
 int ezcfg_nv_linked_list_del(struct ezcfg_nv_linked_list *list);
+int ezcfg_nv_linked_list_clr(struct ezcfg_nv_linked_list *list);
 
 int ezcfg_nv_linked_list_insert(struct ezcfg_nv_linked_list *list, char *name, char *value);
 int ezcfg_nv_linked_list_append(struct ezcfg_nv_linked_list *list, char *name, char *value);

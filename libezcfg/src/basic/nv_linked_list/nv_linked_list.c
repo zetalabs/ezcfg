@@ -86,6 +86,20 @@ int ezcfg_nv_linked_list_del(struct ezcfg_nv_linked_list *list)
   return EZCFG_RET_OK;
 }
 
+int ezcfg_nv_linked_list_clr(struct ezcfg_nv_linked_list *list)
+{
+  ASSERT(list != NULL);
+
+  while(list->head != NULL) {
+    list->tail = list->head;
+    list->head = (list->head)->next;
+    link_node_del(list->tail);
+  }
+  list->tail = NULL;
+  list->length = 0;
+  return EZCFG_RET_OK;
+}
+
 /*
  * add link node to the head
  * replace the node if the name has been there.

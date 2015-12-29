@@ -164,11 +164,13 @@ int agent_env_main(int argc, char **argv)
   }
   umask(0);
 
-  /* make the command line just say "agent_env"  - thats all, nothing else */
-  strncpy(argv[0], "agent_env", strlen(argv[0]));
-  /* wipe argv[1]-argv[N] so they don't clutter the ps listing */
-  while (*++argv)
-    memset(*argv, 0, strlen(*argv));
+  /* make the command line just say "init"  - thats all, nothing else */
+  if (!strcmp(name, "init")) {
+    strcpy(argv[0], "init");
+    /* wipe argv[1]-argv[N] so they don't clutter the ps listing */
+    while (*++argv)
+      memset(*argv, 0, strlen(*argv));
+  }
 
   DBG("<6>agent_env: init_conf=[%s]\n", init_conf);
   rc = ezcfg_api_agent_start(init_conf);

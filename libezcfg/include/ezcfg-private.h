@@ -113,11 +113,8 @@ struct ezcfg_arg_nvram_ssl {
 /*********************************/
 /* composite object header files */
 /*********************************/
-/* composite/json_http/json_http.c */
-#include "ezcfg-priv_composite_json_http.h"
-
-/* composite/nv_json_http_socket/nv_json_http_socket.c */
-#include "ezcfg-priv_composite_nv_json_http_socket.h"
+/* composite/nv_json_http/nv_json_http.c */
+#include "ezcfg-priv_composite_nv_json_http.h"
 
 /* composite/socket_agent/socket_agent.c */
 #include "ezcfg-priv_composite_socket_agent.h"

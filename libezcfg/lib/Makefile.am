@@ -94,14 +94,13 @@ libezcfg_la_SOURCES += ../src/basic/process/process.c
 ###################
 # composite object
 ###################
-# ezcfg NVRAM on JSON over HTTP representation through socket connection
-libezcfg_la_SOURCES += ../src/composite/json_http/json_http.c
+# ezcfg NVRAM on JSON over HTTP representation
+libezcfg_la_SOURCES += ../src/composite/nv_json_http/nv_json_http.c
 
 # ezcfg NVRAM on JSON over HTTP representation through socket connection
 #libezcfg_la_SOURCES += ../src/composite/nv_json_http_socket/nv_json_http_socket.c
 
 # ezcfg Multi-Agent System (MAS) model
-
 # ezcfg socket-based MAS
 libezcfg_la_SOURCES += ../src/composite/socket_agent/socket_agent.c
 #libezcfg_la_SOURCES += ../src/composite/socket_agent/socket_agent_core.c
@@ -175,9 +174,10 @@ libezcfg_la_SOURCES += ../src/util/util_file_get_line.c
 libezcfg_la_SOURCES += ../src/util/util_file_extension.c
 libezcfg_la_SOURCES += ../src/util/util_javascript_var_escaped.c
 libezcfg_la_SOURCES += ../src/util/util_parse_args.c
-libezcfg_la_SOURCES += ../src/util/util_socket_protocol.c
 libezcfg_la_SOURCES += ../src/util/util_socket_domain.c
 libezcfg_la_SOURCES += ../src/util/util_socket_type.c
+libezcfg_la_SOURCES += ../src/util/util_socket_protocol.c
+libezcfg_la_SOURCES += ../src/util/util_socket_role.c
 libezcfg_la_SOURCES += ../src/util/util_socket_mcast.c
 libezcfg_la_SOURCES += ../src/util/util_if_ipaddr.c
 libezcfg_la_SOURCES += ../src/util/util_language.c

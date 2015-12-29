@@ -24,6 +24,7 @@
 #define EZCFG_NVRAM_SOCKET_DOMAIN                "domain"
 #define EZCFG_NVRAM_SOCKET_TYPE                  "type"
 #define EZCFG_NVRAM_SOCKET_PROTOCOL              "protocol"
+#define EZCFG_NVRAM_SOCKET_ROLE                  "role"
 #define EZCFG_NVRAM_SOCKET_LOCAL_ADDRESS         "local_address"
 #define EZCFG_NVRAM_SOCKET_REMOTE_ADDRESS        "remote_address"
 

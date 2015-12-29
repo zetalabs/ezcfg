@@ -37,6 +37,7 @@
 #include "ezcfg-nvram_process.h"
 #include "ezcfg-nvram_sys.h"
 #include "ezcfg-nvram_agent.h"
+#include "ezcfg-nvram_environment.h"
 #if 0
 #include "ezcfg-env.h"
 #include "ezcfg-ezcfg.h"

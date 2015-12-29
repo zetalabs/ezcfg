@@ -138,4 +138,4 @@ int local_nvram_match_entry(struct nvram *nvram, char *name1, char *name2);
 int local_nvram_match_entry_value(struct nvram *nvram, char *name, char *value);
 int local_nvram_is_valid_entry_value(struct nvram *nvram, char *name, char *value);
 
-#endif /* _EZCFG_LOCAL_COMMON_H_ */
+#endif /* _EZCFG_LOCAL_COMMON_EZCFG_LOCAL_H_ */

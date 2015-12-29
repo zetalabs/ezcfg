@@ -6,7 +6,7 @@
  *
  * Description  : interface to configurate ezbox information
  *
- * Copyright (C) 2008-2014 by ezbox-project
+ * Copyright (C) 2008-2016 by ezbox-project
  *
  * History      Rev       Description
  * 2013-07-29   0.1       Write it from scratch
@@ -43,59 +43,15 @@
 #include "ezcfg.h"
 #include "ezcfg-private.h"
 
+#include "socket_agent_local.h"
+
 #ifndef PR_SET_CHILD_SUBREAPER
 #define PR_SET_CHILD_SUBREAPER 36
 #endif
 
-/* bitmap for agent state */
-#define AGENT_STATE_STOPPED     0
-#define AGENT_STATE_RUNNING     1
-#define AGENT_STATE_STOPPING    2
-
-/*
- * ezcfg_socket_agent:
- *
- * Opaque object handling one event source.
- * Multi-Agents System model - agent part.
- */
-struct ezcfg_socket_agent {
-  struct ezcfg *ezcfg; /* agent core */
-  int state; /* Should we stop event loop */
-
-  struct ezcfg_process *process;
-  struct ezcfg_linked_list *child_process_list;
-
-  struct ezcfg_thread *master_thread;
-  struct ezcfg_linked_list *worker_thread_list;
-
-  sigset_t *sigset;
-
-  int thread_stop; /* master thread stop flag */
-  int threads_max; /* MAX number of worker threads */
-  int num_threads; /* Number of worker threads */
-  int num_idle_threads; /* Number of idle worker threads */
-
-  int mutex_init; /* mutex|lock init flag */
-
-  pthread_mutex_t process_mutex; /* Protects child_process_list */
-
-  pthread_mutex_t thread_mutex; /* Protects (max|num)_threads */
-  pthread_rwlock_t thread_rwlock; /* Protects options, callbacks */
-  pthread_cond_t thread_sync_cond; /* Condvar for thread sync */
-
-  struct ezcfg_socket *listening_sockets;
-  pthread_mutex_t ls_mutex; /* Protects listening_sockets */
-
-  struct ezcfg_socket *queue; /* Accepted sockets */
-  int sq_len; /* Length of the socket queue */
-  int sq_head; /* Head of the socket queue */
-  int sq_tail; /* Tail of the socket queue */
-  pthread_cond_t sq_empty_cond; /* Socket queue empty condvar */
-  pthread_cond_t sq_full_cond;  /* Socket queue full condvar */
-};
-
 /* Private variables */
 static int child_process_changed = 0; /* flag for receiving SIGCHLD */
+static int terminate_process = 0; /* flag for receiving SIGTERM */
 
 /* Private functions */
 /*
@@ -113,6 +69,7 @@ static int agent_clr(struct ezcfg_socket_agent *agent)
     }
     agent->child_process_list = NULL;
   }
+
   if (agent->worker_thread_list) {
     ret = ezcfg_linked_list_del(agent->worker_thread_list);
     if (ret != EZCFG_RET_OK) {
@@ -120,6 +77,31 @@ static int agent_clr(struct ezcfg_socket_agent *agent)
     }
     agent->worker_thread_list = NULL;
   }
+
+  if (agent->sub_agent_thread_list) {
+    ret = ezcfg_linked_list_del(agent->sub_agent_thread_list);
+    if (ret != EZCFG_RET_OK) {
+      EZDBG("%s(%d) delete sub_agent_thread_list error!\n", __func__, __LINE__);
+    }
+    agent->sub_agent_thread_list = NULL;
+  }
+
+  if (agent->env_thread) {
+    ret = ezcfg_thread_del(agent->env_thread);
+    if (ret != EZCFG_RET_OK) {
+      EZDBG("%s(%d) delete env_thread error!\n", __func__, __LINE__);
+    }
+    agent->env_thread = NULL;
+  }
+
+  if (agent->env_sp) {
+    ret = ezcfg_socket_del(agent->env_sp);
+    if (ret != EZCFG_RET_OK) {
+      EZDBG("%s(%d) delete env_sp error!\n", __func__, __LINE__);
+    }
+    agent->env_sp = NULL;
+  }
+
   if (agent->master_thread) {
     ret = ezcfg_thread_del(agent->master_thread);
     if (ret != EZCFG_RET_OK) {
@@ -127,23 +109,236 @@ static int agent_clr(struct ezcfg_socket_agent *agent)
     }
     agent->master_thread = NULL;
   }
+
   if (agent->process) {
     ezcfg_process_del(agent->process);
     agent->process = NULL;
   }
 
   if (agent->mutex_init) {
-    pthread_cond_destroy(&(agent->sq_empty_cond));
-    pthread_cond_destroy(&(agent->sq_full_cond));
+    pthread_cond_destroy(&(agent->mw_sq_empty_cond));
+    pthread_cond_destroy(&(agent->mw_sq_full_cond));
 
-    pthread_mutex_destroy(&(agent->ls_mutex));
+    pthread_mutex_destroy(&(agent->mw_ls_mutex));
 
-    pthread_cond_destroy(&(agent->thread_sync_cond));
-    pthread_rwlock_destroy(&(agent->thread_rwlock));
-    pthread_mutex_destroy(&(agent->thread_mutex));
+    pthread_cond_destroy(&(agent->mw_thread_sync_cond));
+    pthread_rwlock_destroy(&(agent->mw_thread_rwlock));
+    pthread_mutex_destroy(&(agent->mw_thread_mutex));
     pthread_mutex_destroy(&(agent->process_mutex));
+
+    pthread_mutex_destroy(&(agent->env_thread_mutex));
+    pthread_mutex_destroy(&(agent->sub_agent_thread_list_mutex));
   }
 
+  return EZCFG_RET_OK;
+}
+
+static int worker_thread_get_socket_from_queue(struct ezcfg_socket_agent *agent, struct ezcfg_socket *sp, int wait_time)
+{
+  struct timespec ts;
+
+  ASSERT(agent != NULL);
+  ASSERT(sp != NULL);
+  ASSERT(wait_time >= 0);
+
+  pthread_mutex_lock(&(agent->mw_thread_mutex));
+  /* If the queue is empty, wait. We're idle at this point. */
+  agent->num_idle_worker_threads++;
+  while (agent->mw_sq_head == agent->mw_sq_tail) {
+    ts.tv_nsec = 0;
+    ts.tv_sec = time(NULL) + wait_time;
+    if (pthread_cond_timedwait(&(agent->mw_sq_empty_cond), &(agent->mw_thread_mutex), &ts) != 0) {
+      /* Timeout! release the mutex and return */
+      pthread_mutex_unlock(&(agent->mw_thread_mutex));
+      return EZCFG_RET_FAIL;
+    }
+  }
+  ASSERT(agent->mw_sq_head > agent->mw_sq_tail);
+
+  /* We're going busy now: got a socket to process! */
+  agent->num_idle_worker_threads--;
+
+  /* Copy socket from the queue and increment tail */
+  ezcfg_socket_queue_get_socket(agent->mw_socket_queue, agent->mw_sq_tail % agent->mw_sq_len, sp);
+  agent->mw_sq_tail++;
+
+  /* Wrap pointers if needed */
+  while (agent->mw_sq_tail >= agent->mw_sq_len) {
+    agent->mw_sq_tail -= agent->mw_sq_len;
+    agent->mw_sq_head -= agent->mw_sq_len;
+  }
+  pthread_cond_signal(&(agent->mw_sq_full_cond));
+  pthread_mutex_unlock(&(agent->mw_thread_mutex));
+
+  return EZCFG_RET_OK;
+}
+
+static void worker_thread_reset_connection_attributes(struct worker_thread_arg *arg) {
+  struct ezcfg_socket_agent *agent = NULL;
+  struct ezcfg *ezcfg = NULL;
+
+  ASSERT(arg != NULL);
+  ASSERT(arg->agent != NULL);
+  agent = arg->agent;
+  ezcfg = agent->ezcfg;
+
+  switch(arg->proto) {
+  case EZCFG_PROTO_NV_JSON_HTTP :
+    ezcfg_nv_json_http_reset_attributes(arg->proto_data);
+    break;
+  default :
+    err(ezcfg, "unknown protocol\n");
+  }
+
+  arg->num_bytes_sent = 0;
+}
+
+static void worker_thread_close_connection(struct worker_thread_arg *arg)
+{
+  ASSERT(arg != NULL);
+
+  ezcfg_socket_close_sock(arg->sp);
+}
+
+static void worker_thread_init_protocol_data(struct worker_thread_arg *arg)
+{
+  struct ezcfg_socket_agent *agent = NULL;
+  struct ezcfg *ezcfg = NULL;
+
+  ASSERT(arg != NULL);
+  /* proto_data should be empty before init */
+  ASSERT(arg->proto_data == NULL);
+  /* socket should not be empty before init */
+  ASSERT(arg->sp != NULL);
+
+  ASSERT(arg->agent != NULL);
+  agent = arg->agent;
+  ezcfg = agent->ezcfg;
+
+  /* set communication protocol */
+  arg->proto = ezcfg_socket_get_proto(arg->sp);
+
+  /* initialize protocol data structure */
+  switch(arg->proto) {
+  case EZCFG_PROTO_NV_JSON_HTTP :
+    arg->proto_data = ezcfg_nv_json_http_new(ezcfg);
+    break;
+  default :
+    info(ezcfg, "unknown protocol\n");
+  }
+}
+
+static void worker_thread_process_new_connection(struct worker_thread_arg *arg)
+{
+  struct ezcfg_socket_agent *agent = NULL;
+  struct ezcfg *ezcfg = NULL;
+
+  ASSERT(arg != NULL);
+  ASSERT(arg->agent != NULL);
+  agent = arg->agent;
+  ezcfg = agent->ezcfg;
+
+  worker_thread_reset_connection_attributes(arg);
+
+  /* dispatch protocol handler */
+  switch(arg->proto) {
+  case EZCFG_PROTO_NV_JSON_HTTP :
+    //ezcfg_socket_agent_worker_thread_process_nv_json_http_new_connection(arg);
+    break;
+  default :
+    err(ezcfg, "unknown protocol\n");
+  }
+}
+
+static void worker_thread_release_protocol_data(struct worker_thread_arg *arg)
+{
+  struct ezcfg_socket_agent *agent = NULL;
+  struct ezcfg *ezcfg = NULL;
+
+  ASSERT(arg != NULL);
+
+  ASSERT(arg->agent != NULL);
+  agent = arg->agent;
+  ezcfg = agent->ezcfg;
+
+  /* release protocol data */
+  switch(arg->proto) {
+  case EZCFG_PROTO_NV_JSON_HTTP :
+    ezcfg_nv_json_http_del(arg->proto_data);
+    arg->proto_data = NULL;
+    break;
+  default :
+    err(ezcfg, "unknown protocol\n");
+  }
+}
+
+/*
+ * worker thread routine
+ */
+static void *worker_thread_routine(void *arg)
+{
+  struct worker_thread_arg *worker_thread_arg = NULL;
+  struct ezcfg_socket_agent *agent = NULL;
+
+  ASSERT(arg != NULL);
+  worker_thread_arg = (struct worker_thread_arg *)arg;
+
+  ASSERT(worker_thread_arg->agent != NULL);
+  agent = worker_thread_arg->agent;
+
+  while ((ezcfg_thread_state_is_running(agent->master_thread) == EZCFG_RET_OK) &&
+         (worker_thread_get_socket_from_queue(agent, worker_thread_arg->sp, EZCFG_AGENT_WORKER_WAIT_TIME) == EZCFG_RET_OK)) {
+
+    /* record start working time */
+    worker_thread_arg->birth_time = time(NULL);
+
+    /* initialize protocol data */
+    worker_thread_init_protocol_data(worker_thread_arg);
+
+    /* process the connection */
+    if (worker_thread_arg->proto_data != NULL) {
+      worker_thread_process_new_connection(worker_thread_arg);
+    }
+
+    /* close connection */
+    worker_thread_close_connection(worker_thread_arg);
+
+    /* release protocol data */
+    if (worker_thread_arg->proto_data != NULL) {
+      worker_thread_release_protocol_data(worker_thread_arg);
+    }
+  }
+
+  return arg;
+}
+
+/*
+ * Don't clear agent and worker_thread, since they are from agent struct.
+ */
+static int worker_thread_arg_del(void *arg)
+{
+  struct worker_thread_arg *worker_thread_arg = arg;
+
+  if (worker_thread_arg->sp) {
+    ezcfg_socket_del(worker_thread_arg->sp);
+    worker_thread_arg->sp = NULL;
+  }
+  if (worker_thread_arg->proto_data) {
+    worker_thread_release_protocol_data(worker_thread_arg);
+    worker_thread_arg->proto_data = NULL;
+  }
+
+  return EZCFG_RET_OK;
+}
+
+/*
+ * stop worker thread
+ */
+static int worker_thread_stop(void *arg)
+{
+  //struct worker_thread_arg *worker_thread_arg = arg;
+
+  EZDBG("%s(%d)\n", __func__, __LINE__);
   return EZCFG_RET_OK;
 }
 
@@ -161,28 +356,29 @@ static int put_socket(struct ezcfg_socket_agent *agent, const struct ezcfg_socke
   struct ezcfg *ezcfg = NULL;
   int ret = EZCFG_RET_FAIL;
   char *val = NULL;
+  struct ezcfg_thread *worker_thread = NULL;
+  struct worker_thread_arg *worker_thread_arg = NULL;
 
   ASSERT(agent != NULL);
   ASSERT(sp != NULL);
 
   ezcfg = agent->ezcfg;
 
-  pthread_mutex_lock(&(agent->thread_mutex));
+  pthread_mutex_lock(&(agent->mw_thread_mutex));
 
   /* If the queue is full, wait */
-  while (agent->sq_head - agent->sq_tail >= agent->sq_len) {
-    pthread_cond_wait(&(agent->sq_full_cond), &(agent->thread_mutex));
+  while (agent->mw_sq_head - agent->mw_sq_tail >= agent->mw_sq_len) {
+    pthread_cond_wait(&(agent->mw_sq_full_cond), &(agent->mw_thread_mutex));
   }
-  ASSERT(agent->sq_head - agent->sq_tail < agent->sq_len);
+  ASSERT(agent->mw_sq_head - agent->mw_sq_tail < agent->mw_sq_len);
 
   /* Copy socket to the queue and increment head */
-  ezcfg_socket_queue_set_socket(agent->queue, agent->sq_head % agent->sq_len, sp);
-  agent->sq_head++;
+  ezcfg_socket_queue_set_socket(agent->mw_socket_queue, agent->mw_sq_head % agent->mw_sq_len, sp);
+  agent->mw_sq_head++;
 
   /* If there is no idle thread, start one */
-  if (agent->num_idle_threads == 0 && agent->num_threads < agent->threads_max) {
-    struct ezcfg_thread *worker_thread = NULL;
-
+  if ((agent->num_idle_worker_threads == 0) &&
+      (agent->num_worker_threads < agent->worker_threads_max)) {
     /* There must be an agent act executor link with core state*/
     EZDBG("%s(%d)\n", __func__, __LINE__);
     ret = ezcfg_common_get_nvram_entry_value(ezcfg, NVRAM_NAME(AGENT, WORKER_THREAD_NAMESPACE), &val);
@@ -199,6 +395,36 @@ static int put_socket(struct ezcfg_socket_agent *agent, const struct ezcfg_socke
       err(ezcfg, "Cannot prepare worker thread: %m\n");
       goto func_out;
     }
+
+    /* Set the worker thread start routine */
+    ret = ezcfg_thread_set_start_routine(worker_thread, worker_thread_routine, worker_thread_arg);
+    if (ret != EZCFG_RET_OK) {
+      EZDBG("%s(%d)\n", __func__, __LINE__);
+      err(ezcfg, "can not set worker thread start routine");
+      goto func_out;
+    }
+    /* worker_thread_arg has been put to worker_thread */
+    worker_thread_arg = NULL;
+
+    /*
+     * Since agent has been passed to worker_thread_routine(),
+     * we don't want it been freed when worker thread stopped.
+     * Here we set an dummy arg delete function to worker thread
+     */
+    ret = ezcfg_thread_set_arg_del_handler(worker_thread, worker_thread_arg_del);
+    if (ret != EZCFG_RET_OK) {
+      EZDBG("%s(%d)\n", __func__, __LINE__);
+      err(ezcfg, "can not set worker thread arg delete function");
+      goto func_out;
+    }
+
+    ret = ezcfg_thread_set_stop(worker_thread, worker_thread_stop);
+    if (ret != EZCFG_RET_OK) {
+      EZDBG("%s(%d)\n", __func__, __LINE__);
+      err(ezcfg, "can not set worker thread stop function");
+      goto func_out;
+    }
+
     ret = ezcfg_thread_start(worker_thread);
     if (ret != EZCFG_RET_OK) {
       err(ezcfg, "Cannot start thread: %m\n");
@@ -208,15 +434,26 @@ static int put_socket(struct ezcfg_socket_agent *agent, const struct ezcfg_socke
     ret = ezcfg_linked_list_append(agent->worker_thread_list, worker_thread);
     if (ret != EZCFG_RET_OK) {
       EZDBG("%s(%d)\n", __func__, __LINE__);
+      ezcfg_thread_stop(worker_thread);
       goto func_out;
     }
-    agent->num_threads++;
+    /* worker_thread has been appened to agent->worker_thread_list */
+    worker_thread = NULL;
+    agent->num_worker_threads++;
   }
   ret = EZCFG_RET_OK;
 
 func_out:
-  pthread_cond_signal(&(agent->sq_empty_cond));
-  pthread_mutex_unlock(&(agent->thread_mutex));
+  if (worker_thread_arg) {
+    worker_thread_arg_del(worker_thread_arg);
+    worker_thread_arg = NULL;
+  }
+  if (worker_thread) {
+    ezcfg_thread_del(worker_thread);
+    worker_thread = NULL;
+  }
+  pthread_cond_signal(&(agent->mw_sq_empty_cond));
+  pthread_mutex_unlock(&(agent->mw_thread_mutex));
   return ret;
 }
 
@@ -243,6 +480,10 @@ static int accept_new_connection(struct ezcfg_socket_agent *agent,
 
   if (allowed == true) {
     ret = put_socket(agent, accepted);
+    if (ret != EZCFG_RET_OK) {
+      EZDBG("%s(%d) put_socket() accepted socket error.\n", __func__, __LINE__);
+      err(ezcfg, "put_socket() accepted socket error.\n");
+    }
     /*FIXME: don't ezcfg_socket_del(), it has been copy to queue */
     free(accepted);
   }
@@ -262,15 +503,15 @@ static void master_thread_finish(struct ezcfg_socket_agent *agent)
 {
   //struct ezcfg_thread *worker_thread;
 
-  pthread_mutex_lock(&(agent->thread_mutex));
+  pthread_mutex_lock(&(agent->mw_thread_mutex));
 
   /* Close all listening sockets */
-  pthread_mutex_lock(&(agent->ls_mutex));
-  if (agent->listening_sockets != NULL) {
-    ezcfg_socket_list_delete(&(agent->listening_sockets));
-    agent->listening_sockets = NULL;
+  pthread_mutex_lock(&(agent->mw_ls_mutex));
+  if (agent->mw_listening_sockets != NULL) {
+    ezcfg_socket_list_delete(&(agent->mw_listening_sockets));
+    agent->mw_listening_sockets = NULL;
   }
-  pthread_mutex_unlock(&(agent->ls_mutex));
+  pthread_mutex_unlock(&(agent->mw_ls_mutex));
 
   /* Close all workers' socket */
 #if 0
@@ -282,16 +523,16 @@ static void master_thread_finish(struct ezcfg_socket_agent *agent)
 #endif
 
   /* Wait until all threads finish */
-  while (agent->num_threads > 0) {
+  while (agent->num_worker_threads > 0) {
     EZDBG("%s(%d)\n", __func__, __LINE__);
-    pthread_cond_wait(&(agent->thread_sync_cond), &(agent->thread_mutex));
+    pthread_cond_wait(&(agent->mw_thread_sync_cond), &(agent->mw_thread_mutex));
   }
-  agent->threads_max = 0;
+  agent->worker_threads_max = 0;
 
-  pthread_mutex_unlock(&(agent->thread_mutex));
+  pthread_mutex_unlock(&(agent->mw_thread_mutex));
 
   /* signal master_thread_stop() that we have done */
-  agent->thread_stop = 1;
+  agent->master_thread_stop = 1;
 }
 
 static void *master_thread_routine(void *arg)
@@ -315,15 +556,15 @@ static void *master_thread_routine(void *arg)
     max_fd = -1;
 
     /* Add listening sockets to the read set */
-    /* lock mutex before handling listening_sockets */
-    pthread_mutex_lock(&(agent->ls_mutex));
+    /* lock mutex before handling mw_listening_sockets */
+    pthread_mutex_lock(&(agent->mw_ls_mutex));
 
-    for (sp = agent->listening_sockets; sp != NULL; sp = ezcfg_socket_list_next(&sp)) {
+    for (sp = agent->mw_listening_sockets; sp != NULL; sp = ezcfg_socket_list_next(&sp)) {
       add_to_set(ezcfg_socket_get_sock(sp), &read_set, &max_fd);
     }
 
-    /* unlock mutex after handling listening_sockets */
-    pthread_mutex_unlock(&(agent->ls_mutex));
+    /* unlock mutex after handling mw_listening_sockets */
+    pthread_mutex_unlock(&(agent->mw_ls_mutex));
 
     /* wait up to EZCFG_AGENT_MASTER_WAIT_TIME seconds. */
     tv.tv_sec = EZCFG_AGENT_MASTER_WAIT_TIME;
@@ -339,10 +580,10 @@ static void *master_thread_routine(void *arg)
       do {} while(0);
     }
     else {
-      /* lock mutex before handling listening_sockets */
-      pthread_mutex_lock(&(agent->ls_mutex));
+      /* lock mutex before handling mw_listening_sockets */
+      pthread_mutex_lock(&(agent->mw_ls_mutex));
 
-      for (sp = agent->listening_sockets;
+      for (sp = agent->mw_listening_sockets;
            sp != NULL;
            sp = ezcfg_socket_list_next(&sp)) {
         if (FD_ISSET(ezcfg_socket_get_sock(sp), &read_set)) {
@@ -352,14 +593,14 @@ static void *master_thread_routine(void *arg)
 
             if (ezcfg_socket_enable_again(sp) < 0) {
               err(ezcfg, "ezcfg_socket_enable_again() failed\n");
-              ezcfg_socket_list_delete_socket(&(agent->listening_sockets), sp);
+              ezcfg_socket_list_delete_socket(&(agent->mw_listening_sockets), sp);
             }
           }
         }
       }
 
-      /* unlock mutex after handling listening_sockets */
-      pthread_mutex_unlock(&(agent->ls_mutex));
+      /* unlock mutex after handling mw_listening_sockets */
+      pthread_mutex_unlock(&(agent->mw_ls_mutex));
     }
     EZDBG("%s(%d)\n", __func__, __LINE__);
   }
@@ -379,6 +620,7 @@ static int master_thread_arg_del(void *arg)
 }
 
 /*
+ * stop master thread
  */
 static int master_thread_stop(void *arg)
 {
@@ -392,7 +634,7 @@ static int master_thread_stop(void *arg)
   agent = (struct ezcfg_socket_agent *)arg;
 
   EZDBG("%s(%d)\n", __func__, __LINE__);
-  while (agent->thread_stop == 0) {
+  while (agent->master_thread_stop == 0) {
     EZDBG("%s(%d)\n", __func__, __LINE__);
     req.tv_sec = EZCFG_AGENT_MASTER_WAIT_TIME;
     req.tv_nsec = 0;
@@ -451,6 +693,98 @@ static int child_process_list_is_stopped(struct ezcfg_socket_agent *agent)
   return EZCFG_RET_OK;
 }
 
+/*
+ * Deallocate agent environment context, free up the resources
+ */
+static void env_thread_finish(struct ezcfg_socket_agent *agent)
+{
+  pthread_mutex_lock(&(agent->env_thread_mutex));
+
+  /* Close all sub_agent environment thread */
+  pthread_mutex_lock(&(agent->sub_agent_thread_list_mutex));
+  /* FIXME: stop sub-agent environment thread first */
+  if (agent->sub_agent_thread_list != NULL) {
+    ezcfg_linked_list_del(agent->sub_agent_thread_list);
+    agent->sub_agent_thread_list = NULL;
+  }
+  pthread_mutex_unlock(&(agent->sub_agent_thread_list_mutex));
+
+  /* signal env_thread_stop() that we have done */
+  agent->env_thread_stop = 1;
+
+  pthread_mutex_unlock(&(agent->env_thread_mutex));
+}
+
+/*
+ * Environment thread routine
+ */
+static void *env_thread_routine(void *arg)
+{
+  struct ezcfg_socket_agent *agent = NULL;
+  struct timespec req;
+  struct timespec rem;
+
+  ASSERT(arg != NULL);
+
+  agent = (struct ezcfg_socket_agent *)arg;
+
+  while (ezcfg_thread_state_is_running(agent->env_thread) == EZCFG_RET_OK) {
+    EZDBG("%s(%d)\n", __func__, __LINE__);
+    req.tv_sec = EZCFG_AGENT_ENVIRONMENT_WAIT_TIME;
+    req.tv_nsec = 0;
+    if (nanosleep(&req, &rem) == -1) {
+      EZDBG("%s(%d) errno=[%d]\n", __func__, __LINE__, errno);
+      EZDBG("%s(%d) rem.tv_sec=[%ld]\n", __func__, __LINE__, (long)rem.tv_sec);
+      EZDBG("%s(%d) rem.tv_nsec=[%ld]\n", __func__, __LINE__, rem.tv_nsec);
+    }
+    EZDBG("%s(%d)\n", __func__, __LINE__);
+  }
+
+  /* Stop signal received: somebody called ezcfg_socket_agent_stop. Quit. */
+  env_thread_finish(agent);
+
+  return arg;
+}
+
+/*
+ * Do nothing, since the env_thread_start_routine use agent struct as its arg
+ */
+static int env_thread_arg_del(void *arg)
+{
+  return EZCFG_RET_OK;
+}
+
+/*
+ * stop environment thread
+ */
+static int env_thread_stop(void *arg)
+{
+  struct ezcfg_socket_agent *agent = NULL;
+  struct timespec req;
+  struct timespec rem;
+
+  ASSERT(arg != NULL);
+
+  EZDBG("%s(%d)\n", __func__, __LINE__);
+  agent = (struct ezcfg_socket_agent *)arg;
+
+  EZDBG("%s(%d)\n", __func__, __LINE__);
+  while (agent->env_thread_stop == 0) {
+    EZDBG("%s(%d)\n", __func__, __LINE__);
+    req.tv_sec = EZCFG_AGENT_ENVIRONMENT_WAIT_TIME;
+    req.tv_nsec = 0;
+    if (nanosleep(&req, &rem) == -1) {
+      EZDBG("%s(%d) errno=[%d]\n", __func__, __LINE__, errno);
+      EZDBG("%s(%d) rem.tv_sec=[%ld]\n", __func__, __LINE__, (long)rem.tv_sec);
+      EZDBG("%s(%d) rem.tv_nsec=[%ld]\n", __func__, __LINE__, rem.tv_nsec);
+    }
+    EZDBG("%s(%d)\n", __func__, __LINE__);
+  }
+
+  EZDBG("%s(%d)\n", __func__, __LINE__);
+  return EZCFG_RET_OK;
+}
+
 static int agent_stop(struct ezcfg_socket_agent *agent)
 {
   int list_length = 0;
@@ -482,7 +816,17 @@ static int agent_stop(struct ezcfg_socket_agent *agent)
   /* unlock mutex after handling child_process_list */
   pthread_mutex_unlock(&(agent->process_mutex));
 
-  /* Then stop master thread */
+  /* Stop environment thread */
+  EZDBG("%s(%d)\n", __func__, __LINE__);
+  if (agent->env_thread) {
+    ret = ezcfg_thread_stop(agent->env_thread);
+    if (ret != EZCFG_RET_OK) {
+      EZDBG("%s(%d)\n", __func__, __LINE__);
+      return EZCFG_RET_FAIL;
+    }
+  }
+ 
+  /* Stop master thread */
   EZDBG("%s(%d)\n", __func__, __LINE__);
   ret = ezcfg_thread_stop(agent->master_thread);
   if (ret != EZCFG_RET_OK) {
@@ -555,6 +899,16 @@ static void sigchld_handler(int sig, siginfo_t *si, void *unused)
   EZDBG("Got SIGCHLD si_code: %d\n", (int)si->si_code);
   EZDBG("Got SIGCHLD si_status: %d\n", (int)si->si_status);
   child_process_changed = 1;
+}
+
+static void sigterm_handler(int sig, siginfo_t *si, void *unused)
+{
+  EZDBG("Got SIGTERM at address: 0x%lx\n", (long) si->si_addr);
+  EZDBG("Got SIGTERM from pid: %d\n", (int)si->si_pid);
+  EZDBG("Got SIGTERM si_signo: %d\n", (int)si->si_signo);
+  EZDBG("Got SIGTERM si_code: %d\n", (int)si->si_code);
+  EZDBG("Got SIGTERM si_status: %d\n", (int)si->si_status);
+  terminate_process = 1;
 }
 
 /********************/
@@ -670,31 +1024,31 @@ struct ezcfg_socket_agent *ezcfg_socket_agent_new(struct ezcfg *ezcfg)
 
   /* initialize worker threads */
   EZDBG("%s(%d)\n", __func__, __LINE__);
-  agent->threads_max = EZCFG_AGENT_WORKER_THREADS_MAX; /* MAX number of worker threads */
+  agent->worker_threads_max = EZCFG_AGENT_WORKER_THREADS_MAX; /* MAX number of worker threads */
   ret = ezcfg_common_get_nvram_entry_value(ezcfg, NVRAM_NAME(AGENT, WORKER_THREADS_MAX), &val);
   if (ret != EZCFG_RET_OK) {
     EZDBG("%s(%d)\n", __func__, __LINE__);
   }
   if (val) {
-    agent->threads_max = atoi(val);
+    agent->worker_threads_max = atoi(val);
     free(val);
     val = NULL;
   }
 
   /* initialize socket queue */
   EZDBG("%s(%d)\n", __func__, __LINE__);
-  agent->sq_len = EZCFG_AGENT_SOCKET_QUEUE_LENGTH;
+  agent->mw_sq_len = EZCFG_AGENT_SOCKET_QUEUE_LENGTH;
   ret = ezcfg_common_get_nvram_entry_value(ezcfg, NVRAM_NAME(AGENT, SOCKET_QUEUE_LENGTH), &val);
   if (ret != EZCFG_RET_OK) {
     EZDBG("%s(%d)\n", __func__, __LINE__);
   }
   if (val) {
-    agent->sq_len = atoi(val);
+    agent->mw_sq_len = atoi(val);
     free(val);
     val = NULL;
   }
-  agent->queue = ezcfg_socket_calloc(ezcfg, agent->sq_len);
-  if (agent->queue == NULL) {
+  agent->mw_socket_queue = ezcfg_socket_calloc(ezcfg, agent->mw_sq_len);
+  if (agent->mw_socket_queue == NULL) {
     EZDBG("%s(%d)\n", __func__, __LINE__);
     err(ezcfg, "calloc socket queue.");
     goto fail_out;
@@ -715,7 +1069,7 @@ struct ezcfg_socket_agent *ezcfg_socket_agent_new(struct ezcfg *ezcfg)
   }
 
   /*
-   * handle SIGCHLD signal, so if child process exit we can update child_process_list
+   * handle SIGCHLD signal, so if child process exits we can update child_process_list
    */
   sa.sa_flags = SA_SIGINFO;
   sigemptyset(&sa.sa_mask);
@@ -726,14 +1080,38 @@ struct ezcfg_socket_agent *ezcfg_socket_agent_new(struct ezcfg *ezcfg)
     goto fail_out;
   }
 
+  /*
+   * handle SIGTERM signal, so if process receives termination signal main thread can notify master thread
+   */
+  sa.sa_flags = SA_SIGINFO;
+  sigemptyset(&sa.sa_mask);
+  sa.sa_sigaction = sigterm_handler;
+  if (sigaction(SIGTERM, &sa, NULL) == -1) {
+    EZDBG("%s(%d)\n", __func__, __LINE__);
+    err(ezcfg, "sigaction(TERM).");
+    goto fail_out;
+  }
+
+  /* There must be an sub-agent thread list */
+  agent->sub_agent_thread_list = ezcfg_linked_list_new(ezcfg,
+      ezcfg_thread_del_handler,
+      ezcfg_thread_cmp_handler);
+  if (agent->sub_agent_thread_list == NULL) {
+    EZDBG("%s(%d)\n", __func__, __LINE__);
+    err(ezcfg, "can not initialize sub-agent thread list");
+    goto fail_out;
+  }
+
   /* initialize thread mutex */
   pthread_mutex_init(&(agent->process_mutex), NULL);
-  pthread_mutex_init(&(agent->thread_mutex), NULL);
-  pthread_rwlock_init(&(agent->thread_rwlock), NULL);
-  pthread_cond_init(&(agent->thread_sync_cond), NULL);
-  pthread_mutex_init(&(agent->ls_mutex), NULL);
-  pthread_cond_init(&(agent->sq_empty_cond), NULL);
-  pthread_cond_init(&(agent->sq_full_cond), NULL);
+  pthread_mutex_init(&(agent->mw_thread_mutex), NULL);
+  pthread_rwlock_init(&(agent->mw_thread_rwlock), NULL);
+  pthread_cond_init(&(agent->mw_thread_sync_cond), NULL);
+  pthread_mutex_init(&(agent->mw_ls_mutex), NULL);
+  pthread_cond_init(&(agent->mw_sq_empty_cond), NULL);
+  pthread_cond_init(&(agent->mw_sq_full_cond), NULL);
+  pthread_mutex_init(&(agent->env_thread_mutex), NULL);
+  pthread_mutex_init(&(agent->sub_agent_thread_list_mutex), NULL);
 
   /* tag mutex|lock initialized */
   agent->mutex_init = 1;
@@ -796,12 +1174,11 @@ int ezcfg_socket_agent_start(struct ezcfg_socket_agent *agent)
   struct ezcfg_socket *sp = NULL;
   int ret = EZCFG_RET_FAIL;
   char *val = NULL;
-  char socket_ns[EZCFG_NAME_MAX];
+  char ns[EZCFG_NAME_MAX];
   char name[EZCFG_NAME_MAX];
   int sock_num = 0;
   int i = 0;
   struct ezcfg_process *child_process = NULL;
-  char cp_ns[EZCFG_NAME_MAX];
   int child_number = 0;
 
   ASSERT(agent != NULL);
@@ -818,7 +1195,7 @@ int ezcfg_socket_agent_start(struct ezcfg_socket_agent *agent)
 
   ret = ezcfg_thread_start(agent->master_thread);
   if (ret != EZCFG_RET_OK) {
-    EZDBG("%s(%d) ezcfg_thread_start() error.\n", __func__, __LINE__);
+    EZDBG("%s(%d) ezcfg_thread_start(master_thread) error.\n", __func__, __LINE__);
     return EZCFG_RET_FAIL;
   }
 
@@ -830,13 +1207,13 @@ int ezcfg_socket_agent_start(struct ezcfg_socket_agent *agent)
     goto fail_out;
   }
   if (val) {
-    snprintf(socket_ns, sizeof(socket_ns), "%s", val);
+    snprintf(ns, sizeof(ns), "%s", val);
     free(val);
     val = NULL;
   }
 
   EZDBG("%s(%d)\n", __func__, __LINE__);
-  snprintf(name, sizeof(name), "%s%s", socket_ns, NVRAM_NAME(SOCKET, NUMBER));
+  snprintf(name, sizeof(name), "%s%s", ns, NVRAM_NAME(SOCKET, NUMBER));
   ret = ezcfg_common_get_nvram_entry_value(ezcfg, name, &val);
   if (ret != EZCFG_RET_OK) {
     EZDBG("%s(%d)\n", __func__, __LINE__);
@@ -851,7 +1228,7 @@ int ezcfg_socket_agent_start(struct ezcfg_socket_agent *agent)
   EZDBG("%s(%d)\n", __func__, __LINE__);
   for (i = 1; i <= sock_num; i++) {
     EZDBG("%s(%d) i=[%d]\n", __func__, __LINE__, i);
-    snprintf(name, sizeof(name), "%s%d.", socket_ns, i);
+    snprintf(name, sizeof(name), "%s%d.", ns, i);
     sp = ezcfg_socket_new(ezcfg, name);
     if (sp == NULL) {
       err(ezcfg, "init socket fail: %m\n");
@@ -859,42 +1236,49 @@ int ezcfg_socket_agent_start(struct ezcfg_socket_agent *agent)
       goto fail_out;
     }
 
-    /* lock mutex before handling listening_sockets */
-    pthread_mutex_lock(&(agent->ls_mutex));
+    if (ezcfg_socket_role_is_server(sp) != EZCFG_RET_OK) {
+      EZDBG("%s(%d) socket role is not server\n", __func__, __LINE__);
+      ezcfg_socket_del(sp);
+      sp = NULL;
+      continue;
+    }
 
-    if (ezcfg_socket_list_insert(&(agent->listening_sockets), sp) < 0) {
+    /* lock mutex before handling mw_listening_sockets */
+    pthread_mutex_lock(&(agent->mw_ls_mutex));
+
+    if (ezcfg_socket_list_insert(&(agent->mw_listening_sockets), sp) < 0) {
       err(ezcfg, "insert listener socket fail: %m\n");
       EZDBG("%s(%d) insert listener socket fail: %m\n", __func__, __LINE__);
       ezcfg_socket_del(sp);
       sp = NULL;
-      /* unlock mutex after handling listening_sockets */
-      pthread_mutex_unlock(&(agent->ls_mutex));
+      /* unlock mutex after handling mw_listening_sockets */
+      pthread_mutex_unlock(&(agent->mw_ls_mutex));
       goto fail_out;
     }
 
     if (ezcfg_socket_enable_receiving(sp) < 0) {
       err(ezcfg, "enable socket [%d] receiving fail: %m\n", i);
       EZDBG("%s(%d) enable socket [%d] receiving fail: %m\n", __func__, __LINE__, i);
-      ezcfg_socket_list_delete_socket(&(agent->listening_sockets), sp);
-      /* unlock mutex after handling listening_sockets */
-      pthread_mutex_unlock(&(agent->ls_mutex));
+      ezcfg_socket_list_delete_socket(&(agent->mw_listening_sockets), sp);
+      /* unlock mutex after handling mw_listening_sockets */
+      pthread_mutex_unlock(&(agent->mw_ls_mutex));
       goto fail_out;
     }
 
-    if (ezcfg_socket_enable_listening(sp, agent->sq_len) < 0) {
+    if (ezcfg_socket_enable_listening(sp, agent->mw_sq_len) < 0) {
       err(ezcfg, "enable socket [%d] listening fail: %m\n", i);
       EZDBG("%s(%d) enable socket [%d] listening fail: %m\n", __func__, __LINE__, i);
-      ezcfg_socket_list_delete_socket(&(agent->listening_sockets), sp);
-      /* unlock mutex after handling listening_sockets */
-      pthread_mutex_unlock(&(agent->ls_mutex));
+      ezcfg_socket_list_delete_socket(&(agent->mw_listening_sockets), sp);
+      /* unlock mutex after handling mw_listening_sockets */
+      pthread_mutex_unlock(&(agent->mw_ls_mutex));
       goto fail_out;
     }
 
     ezcfg_socket_set_close_on_exec(sp);
     sp = NULL;
 
-    /* unlock mutex after handling listening_sockets */
-    pthread_mutex_unlock(&(agent->ls_mutex));
+    /* unlock mutex after handling mw_listening_sockets */
+    pthread_mutex_unlock(&(agent->mw_ls_mutex));
   }
 
   /* Prepare child process */
@@ -903,12 +1287,12 @@ int ezcfg_socket_agent_start(struct ezcfg_socket_agent *agent)
   if (ret == EZCFG_RET_OK) {
     /* get child process namespace */
     EZDBG("%s(%d)\n", __func__, __LINE__);
-    snprintf(cp_ns, sizeof(cp_ns), "%s", val);
+    snprintf(ns, sizeof(ns), "%s", val);
     free(val);
     val = NULL;
 
     /* get child process number */
-    ret = ezcfg_util_snprintf_ns_name(name, sizeof(name), cp_ns, NVRAM_NAME(PROCESS, NUMBER));
+    ret = ezcfg_util_snprintf_ns_name(name, sizeof(name), ns, NVRAM_NAME(PROCESS, NUMBER));
     if (ret != EZCFG_RET_OK) {
       EZDBG("%s(%d)\n", __func__, __LINE__);
       goto fail_out;
@@ -939,7 +1323,7 @@ int ezcfg_socket_agent_start(struct ezcfg_socket_agent *agent)
     }
 
     for (i = 1; i <= child_number; i++) {
-      snprintf(name, sizeof(name), "%s%d.", cp_ns, i);
+      snprintf(name, sizeof(name), "%s%d.", ns, i);
       child_process = ezcfg_process_new(ezcfg, name);
       if (child_process == NULL) {
         EZDBG("%s(%d)\n", __func__, __LINE__);
@@ -961,6 +1345,110 @@ int ezcfg_socket_agent_start(struct ezcfg_socket_agent *agent)
 
     /* unlock mutex after handling child_process_list */
     pthread_mutex_unlock(&(agent->process_mutex));
+  }
+
+  /* Join environment */
+  EZDBG("%s(%d)\n", __func__, __LINE__);
+  ret = ezcfg_common_get_nvram_entry_value(ezcfg, NVRAM_NAME(AGENT, ENVIRONMENT_NAMESPACE), &val);
+  if (ret == EZCFG_RET_OK) {
+    EZDBG("%s(%d)\n", __func__, __LINE__);
+    /* get environment namespace */
+    snprintf(ns, sizeof(ns), "%s", val);
+    free(val);
+    val = NULL;
+    EZDBG("%s(%d) ns=[%s]\n", __func__, __LINE__, ns);
+
+    /* get environment thread namespace */
+    ret = ezcfg_util_snprintf_ns_name(name, sizeof(name), ns, NVRAM_NAME(ENVIRONMENT, THREAD_NAMESPACE));
+    if (ret != EZCFG_RET_OK) {
+      EZDBG("%s(%d)\n", __func__, __LINE__);
+      goto fail_out;
+    }
+    EZDBG("%s(%d) name=[%s]\n", __func__, __LINE__, name);
+    ret = ezcfg_common_get_nvram_entry_value(ezcfg, name, &val);
+    if (ret != EZCFG_RET_OK) {
+      EZDBG("%s(%d)\n", __func__, __LINE__);
+      goto fail_out;
+    }
+    if (val) {
+      EZDBG("%s(%d)\n", __func__, __LINE__);
+      snprintf(name, sizeof(name), "%s", val);
+      free(val);
+      val = NULL;
+    }
+
+    agent->env_thread = ezcfg_thread_new(ezcfg, name);
+    if (agent->env_thread == NULL) {
+      EZDBG("%s(%d)\n", __func__, __LINE__);
+      err(ezcfg, "can not initialize agent master thread");
+      goto fail_out;
+    }
+
+    /* Set the master thread start routine */
+    ret = ezcfg_thread_set_start_routine(agent->env_thread, env_thread_routine, agent);
+    if (ret != EZCFG_RET_OK) {
+      EZDBG("%s(%d)\n", __func__, __LINE__);
+      err(ezcfg, "can not set master thread start routine");
+      goto fail_out;
+    }
+
+    /*
+     * Since agent has been passed to env_thread_routine(),
+     * we don't want it been freed when environment thread stopped.
+     * Here we set an dummy arg delete function to environment thread
+     */
+    ret = ezcfg_thread_set_arg_del_handler(agent->env_thread, env_thread_arg_del);
+    if (ret != EZCFG_RET_OK) {
+      EZDBG("%s(%d)\n", __func__, __LINE__);
+      err(ezcfg, "can not set environment thread arg delete function");
+      goto fail_out;
+    }
+
+    ret = ezcfg_thread_set_stop(agent->env_thread, env_thread_stop);
+    if (ret != EZCFG_RET_OK) {
+      EZDBG("%s(%d)\n", __func__, __LINE__);
+      err(ezcfg, "can not set environment thread stop function");
+      goto fail_out;
+    }
+
+    /* get environment socket namespace */
+    EZDBG("%s(%d)\n", __func__, __LINE__);
+    ret = ezcfg_util_snprintf_ns_name(name, sizeof(name), ns, NVRAM_NAME(ENVIRONMENT, SOCKET_NAMESPACE));
+    if (ret != EZCFG_RET_OK) {
+      goto fail_out;
+    }
+    EZDBG("%s(%d) name=[%s]\n", __func__, __LINE__, name);
+    ret = ezcfg_common_get_nvram_entry_value(ezcfg, name, &val);
+    if (ret != EZCFG_RET_OK) {
+      EZDBG("%s(%d)\n", __func__, __LINE__);
+      goto fail_out;
+    }
+    if (val) {
+      EZDBG("%s(%d)\n", __func__, __LINE__);
+      snprintf(name, sizeof(name), "%s", val);
+      free(val);
+      val = NULL;
+    }
+
+    agent->env_sp = ezcfg_socket_new(ezcfg, name);
+    if (agent->env_sp == NULL) {
+      EZDBG("%s(%d) init socket fail: %m\n", __func__, __LINE__);
+      err(ezcfg, "init socket fail: %m\n");
+      goto fail_out;
+    }
+
+    if (ezcfg_socket_role_is_client(agent->env_sp) != EZCFG_RET_OK) {
+      EZDBG("%s(%d) socket role is not client\n", __func__, __LINE__);
+      goto fail_out;
+    }
+
+    ezcfg_socket_set_close_on_exec(agent->env_sp);
+
+    ret = ezcfg_thread_start(agent->env_thread);
+    if (ret != EZCFG_RET_OK) {
+      EZDBG("%s(%d) ezcfg_thread_start(env_thread) error.\n", __func__, __LINE__);
+      goto fail_out;
+    }
   }
 
   /* Successfully create agent, wait master_thread to stop */
@@ -1040,6 +1528,7 @@ int ezcfg_socket_agent_main_loop(struct ezcfg_socket_agent *agent)
 {
   struct timespec req;
   struct timespec rem;
+  int ret = EZCFG_RET_FAIL;
 
   ASSERT(agent != NULL);
 
@@ -1054,9 +1543,19 @@ int ezcfg_socket_agent_main_loop(struct ezcfg_socket_agent *agent)
       EZDBG("%s(%d) rem.tv_nsec=[%ld]\n", __func__, __LINE__, rem.tv_nsec);
     }
     EZDBG("%s(%d)\n", __func__, __LINE__);
+    if (terminate_process) {
+      ret = agent_stop(agent);
+      if (ret != EZCFG_RET_OK) {
+        EZDBG("%s(%d) agent_stop() error.\n", __func__, __LINE__);
+      }
+    }
+    EZDBG("%s(%d)\n", __func__, __LINE__);
     if (child_process_changed) {
       child_process_changed = 0;
-      update_child_process_list(agent);
+      ret = update_child_process_list(agent);
+      if (ret != EZCFG_RET_OK) {
+        EZDBG("%s(%d) update_child_process_list() error.\n", __func__, __LINE__);
+      }
     }
   }
 

@@ -150,6 +150,7 @@
 #define EZCFG_AGENT_MASTER_WAIT_TIME            1
 #define EZCFG_AGENT_WORKER_WAIT_TIME            1
 #define EZCFG_AGENT_WORKER_THREADS_MAX          10
+#define EZCFG_AGENT_ENVIRONMENT_WAIT_TIME       1
 
 
 /* ezcfg file trailing charlist */
@@ -270,6 +271,16 @@
 
 #define EZCFG_PROTO_UPNP_GENA_PORT_NUMBER         61900
 #define EZCFG_PROTO_UPNP_GENA_PORT_NUMBER_STRING  "61900"
+
+
+/* ezcfg supported socket roles */
+#define EZCFG_SOCKET_ROLE_UNKNOWN             0
+#define EZCFG_SOCKET_ROLE_SERVER              1
+#define EZCFG_SOCKET_ROLE_CLIENT              2
+
+//#define EZCFG_SOCKET_ROLE_UNKNOWN_STRING         "unknown"
+#define EZCFG_SOCKET_ROLE_SERVER_STRING            "server"
+#define EZCFG_SOCKET_ROLE_CLIENT_STRING            "client"
 
 
 /* ezcfg json definitions */
