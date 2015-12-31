@@ -399,6 +399,8 @@
 #define EZCFG_HTTP_MODE_REQUEST        0
 #define EZCFG_HTTP_MODE_RESPONSE       1
 
+/* ezcfg nvram/json HTTP URI */
+#define EZCFG_HTTP_NV_JSON_URI              "/ezcfg/nv_json"
 
 /* ezcfg HTTP html request/response mode */
 #define EZCFG_HTTP_HTML_HOME_INDEX_URI      "/"

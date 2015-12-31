@@ -44,11 +44,8 @@
 
 #include "ezcfg.h"
 #include "ezcfg-private.h"
-//#include "ezcfg-nv_json_http_socket.h"
 
 #include "ezcfg-api.h"
-
-#define EZCFG_NV_JSON_HTTP_URI                   "/ezcfg/nv_json"
 
 static bool debug = false;
 static int
@@ -855,7 +852,7 @@ int ezcfg_api_nvram_change(char *init_conf, char *ns, char *nv_json, char **pres
 
   /* build HTTP request line */
   ezcfg_http_set_request_method(http, EZCFG_HTTP_METHOD_POST);
-  snprintf(buf, sizeof(buf), "%s", EZCFG_NV_JSON_HTTP_URI);
+  snprintf(buf, sizeof(buf), "%s", EZCFG_HTTP_NV_JSON_URI);
   ezcfg_http_set_request_uri(http, buf);
   ezcfg_http_set_version_major(http, 1);
   ezcfg_http_set_version_minor(http, 1);

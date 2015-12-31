@@ -23,6 +23,7 @@
 #define EZCFG_NVRAM_PROCESS_FORK                  "fork"
 #define EZCFG_NVRAM_PROCESS_ARGC                  "argc"
 #define EZCFG_NVRAM_PROCESS_ARGV                  "argv"
+#define EZCFG_NVRAM_PROCESS_COMMAND               "command"
 #define EZCFG_NVRAM_PROCESS_FORCE_STOP            "force_stop"
 #define EZCFG_NVRAM_PROCESS_NUMBER                "number"
 

@@ -89,4 +89,25 @@ struct worker_thread_arg {
   int64_t num_bytes_sent;
 };
 
+/* socket_agent_master_thread.c */
+void *local_socket_agent_master_thread_routine(void *arg);
+int local_socket_agent_master_thread_arg_del(void *arg);
+int local_socket_agent_master_thread_stop(void *arg);
+int local_socket_agent_master_thread_is_stopped(struct ezcfg_socket_agent *agent);
+
+/* socket_agent_worker_thread.c */
+int local_socket_agent_worker_thread_printf(struct worker_thread_arg *arg, const char *fmt, ...);
+int local_socket_agent_worker_thread_write(struct worker_thread_arg *arg, const char *buf, int len);
+void *local_socket_agent_worker_thread_routine(void *arg);
+int local_socket_agent_worker_thread_arg_del(void *arg);
+int local_socket_agent_worker_thread_stop(void *arg);
+
+/* socket_agent_worker_thread_nv_json_http.c */
+void local_socket_agent_worker_thread_process_nv_json_http_new_connection(struct worker_thread_arg *arg);
+
+/* socket_agent_env_thread.c */
+void *local_socket_agent_env_thread_routine(void *arg);
+int local_socket_agent_env_thread_arg_del(void *arg);
+int local_socket_agent_env_thread_stop(void *arg);
+
 #endif /* _EZCFG_LOCAL_COMPOSITE_SOCKET_AGENT_SOCKET_AGENT_LOCAL_H_ */

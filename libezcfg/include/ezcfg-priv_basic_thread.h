@@ -27,6 +27,7 @@ int ezcfg_thread_set_arg_del_handler(struct ezcfg_thread *thread, int (*func)(vo
 int ezcfg_thread_set_stop(struct ezcfg_thread *thread, int (*func)(void *));
 int ezcfg_thread_start(struct ezcfg_thread *thread);
 int ezcfg_thread_stop(struct ezcfg_thread *thread);
+int ezcfg_thread_kill(struct ezcfg_thread *thread, int sig);
 
 int ezcfg_thread_state_is_running(struct ezcfg_thread *thread);
 int ezcfg_thread_state_is_stopped(struct ezcfg_thread *thread);

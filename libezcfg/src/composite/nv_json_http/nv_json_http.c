@@ -35,7 +35,7 @@ struct ezcfg_nv_json_http {
   struct ezcfg *ezcfg;
   struct ezcfg_http *http;
   struct ezcfg_json *json;
-  struct ezcfg_nv_linked_list *nv_list;
+  struct ezcfg_linked_list *nv_list;
 };
 
 /* for JSON/HTTP binding request methods */
@@ -57,6 +57,27 @@ static const char *nv_json_http_header_strings[] = {
 };
 
 /**
+ * Private functions
+ **/
+/* it must be nvram has a state coherence with list */
+static int build_nv_json_http_response(struct ezcfg_nv_json_http *njh)
+{
+  struct ezcfg_http *http = NULL;
+
+  ASSERT(njh != NULL);
+  http = njh->http;
+
+  /* FIXME: name point to http->request_uri !!!
+   * never reset http before using name */
+  /* clean http structure info */
+  ezcfg_http_reset_attributes(http);
+  ezcfg_http_set_status_code(http, 200);
+  ezcfg_http_set_state_response(http);
+
+  return EZCFG_RET_OK;
+}
+
+/**
  * Public functions
  **/
 int ezcfg_nv_json_http_del(struct ezcfg_nv_json_http *njh)
@@ -74,7 +95,7 @@ int ezcfg_nv_json_http_del(struct ezcfg_nv_json_http *njh)
     ezcfg_http_del(njh->http);
 
   if (njh->nv_list != NULL)
-    ezcfg_nv_linked_list_del(njh->nv_list);
+    ezcfg_linked_list_del(njh->nv_list);
 
   free(njh);
   return EZCFG_RET_OK;
@@ -110,11 +131,13 @@ struct ezcfg_nv_json_http *ezcfg_nv_json_http_new(struct ezcfg *ezcfg)
     return NULL;
   }
 
-  njh->nv_list = ezcfg_nv_linked_list_new(ezcfg);
+#if 0
+  njh->nv_list = ezcfg_linked_list_new(ezcfg);
   if (njh->nv_list == NULL) {
     ezcfg_nv_json_http_del(njh);
     return NULL;
   }
+#endif
 
   njh->ezcfg = ezcfg;
   ezcfg_http_set_method_strings(njh->http, nv_json_http_method_strings, ARRAY_SIZE(nv_json_http_method_strings) - 1);
@@ -214,13 +237,15 @@ int ezcfg_nv_json_http_reset_attributes(struct ezcfg_nv_json_http *njh)
   ASSERT(njh != NULL);
   ASSERT(njh->http != NULL);
   ASSERT(njh->json != NULL);
-  ASSERT(njh->nv_list != NULL);
 
   //ezcfg = njh->ezcfg;
 
   ezcfg_http_reset_attributes(njh->http);
   ezcfg_json_reset(njh->json);
-  ezcfg_nv_linked_list_clr(njh->nv_list);
+  if (njh->nv_list) {
+    ezcfg_linked_list_del(njh->nv_list);
+    njh->nv_list = NULL;
+  }
 
   return EZCFG_RET_OK;
 }
@@ -389,4 +414,25 @@ int ezcfg_nv_json_http_write_message(struct ezcfg_nv_json_http *njh, char *buf, 
   }
 
   return (p-buf);
+}
+
+int ezcfg_nv_json_http_handle_request(struct ezcfg_nv_json_http *njh)
+{
+  struct ezcfg_json *json;
+  int ret = EZCFG_RET_FAIL;
+
+  ASSERT(njh != NULL);
+  ASSERT(njh->http != NULL);
+  ASSERT(njh->json != NULL);
+  ASSERT(njh->nv_list == NULL);
+
+  json = njh->json;
+
+  /* json contains parsed text info */
+  njh->nv_list = ezcfg_json_build_nvram_node_list(json);
+  if (njh->nv_list != NULL) {
+    ret = build_nv_json_http_response(njh);
+  }
+
+  return ret;
 }

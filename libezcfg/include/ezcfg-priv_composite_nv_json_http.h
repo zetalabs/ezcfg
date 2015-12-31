@@ -38,5 +38,6 @@ char *ezcfg_nv_json_http_set_message_body(struct ezcfg_nv_json_http *njh, const 
 int ezcfg_nv_json_http_dump(struct ezcfg_nv_json_http *njh);
 int ezcfg_nv_json_http_get_message_length(struct ezcfg_nv_json_http *njh);
 int ezcfg_nv_json_http_write_message(struct ezcfg_nv_json_http *njh, char *buf, int len);
+int ezcfg_nv_json_http_handle_request(struct ezcfg_nv_json_http *njh);
 
 #endif /* _EZCFG_PRIV_COMPOSITE_NV_JSON_HTTP_H_ */

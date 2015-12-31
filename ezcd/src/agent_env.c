@@ -172,14 +172,21 @@ int agent_env_main(int argc, char **argv)
       memset(*argv, 0, strlen(*argv));
   }
 
-  DBG("<6>agent_env: init_conf=[%s]\n", init_conf);
+  DBG("<6>pid=[%d] %s(%d) agent_env: init_conf=[%s]\n",
+      getpid(), __func__, __LINE__, init_conf);
   rc = ezcfg_api_agent_start(init_conf);
 
   /* should never run to this place!!! */
 func_out:
-  DBG("<6>agent_env: should never run to this place!!!\n");
-  if (init_conf)
+  DBG("<6>pid=[%d] %s(%d) agent_env: rc=[%d]\n", getpid(), __func__, __LINE__, rc);
+  if (init_conf) {
     free(init_conf);
+    init_conf = NULL;
+  }
 
-  return rc;
+  DBG("<6>pid=[%d] %s(%d) agent_env: exit!!!\n", getpid(), __func__, __LINE__);
+  if (rc == 0)
+    exit(EXIT_SUCCESS);
+  else
+    exit(EXIT_FAILURE);
 }

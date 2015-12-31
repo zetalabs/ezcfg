@@ -52,6 +52,7 @@
 
 struct ezcfg_process {
   struct ezcfg *ezcfg;
+  pthread_mutex_t process_mutex;
   pid_t process_id; /* process's own pid */
   char *command; /* process command */
   int state; /* process state */
@@ -142,6 +143,13 @@ struct ezcfg_process *ezcfg_process_new(struct ezcfg *ezcfg, char *ns)
     return NULL;
   }
 
+  process = (struct ezcfg_process *)calloc(1, sizeof(struct ezcfg_process));
+  if (process == NULL) {
+    EZDBG("%s(%d)\n", __func__, __LINE__);
+    err(ezcfg, "can not calloc process\n");
+    goto exit_fail;
+  }
+
   /* first check if it need to be forked */
   ret = ezcfg_util_snprintf_ns_name(name, sizeof(name), ns, NVRAM_NAME(PROCESS, FORK));
   if (ret != EZCFG_RET_OK) {
@@ -159,7 +167,24 @@ struct ezcfg_process *ezcfg_process_new(struct ezcfg *ezcfg, char *ns)
     val = NULL;
   }
 
-  if (need_fork) {
+  if (need_fork == 0) {
+    /* handle no fork case */
+    EZDBG("%s(%d)\n", __func__, __LINE__);
+    process->process_id = getpid();
+    process->command = get_pid_command(process->process_id);
+    if (process->command == NULL) {
+      EZDBG("%s(%d)\n", __func__, __LINE__);
+      err(ezcfg, "can not get process command\n");
+      goto exit_fail;
+    }
+    pthread_mutex_init(&(process->process_mutex), NULL);
+    process->state = PROCESS_STATE_RUNNING;
+    process->force_stop = force_stop;
+    process->ezcfg = ezcfg;
+    EZDBG("%s(%d) pid=[%d] cmd=[%s]\n", __func__, __LINE__, process->process_id, process->command);
+    return process;
+  }
+  else {
     /* prepare information for new process */
     ret = ezcfg_util_snprintf_ns_name(name, sizeof(name), ns, NVRAM_NAME(PROCESS, ARGC));
     if (ret != EZCFG_RET_OK) {
@@ -197,6 +222,18 @@ struct ezcfg_process *ezcfg_process_new(struct ezcfg *ezcfg, char *ns)
         val = NULL;
       }
     }
+    /* If set command, put it to process->command */
+    ret = ezcfg_util_snprintf_ns_name(name, sizeof(name), ns, NVRAM_NAME(PROCESS, COMMAND));
+    if (ret != EZCFG_RET_OK) {
+      EZDBG("%s(%d)\n", __func__, __LINE__);
+      goto exit_fail;
+    }
+    ret = ezcfg_common_get_nvram_entry_value(ezcfg, name, &val);
+    if (ret == EZCFG_RET_OK) {
+      EZDBG("%s(%d)\n", __func__, __LINE__);
+      process->command = val;
+      val = NULL;
+    }
   }
 
   ret = ezcfg_util_snprintf_ns_name(name, sizeof(name), ns, NVRAM_NAME(PROCESS, FORCE_STOP));
@@ -214,30 +251,6 @@ struct ezcfg_process *ezcfg_process_new(struct ezcfg *ezcfg, char *ns)
     val = NULL;
   }
 
-  process = (struct ezcfg_process *)calloc(1, sizeof(struct ezcfg_process));
-  if (process == NULL) {
-    EZDBG("%s(%d)\n", __func__, __LINE__);
-    err(ezcfg, "can not calloc process\n");
-    goto exit_fail;
-  }
-
-  if (need_fork == 0) {
-    /* handle no fork case */
-    EZDBG("%s(%d)\n", __func__, __LINE__);
-    process->process_id = getpid();
-    process->command = get_pid_command(process->process_id);
-    if (process->command == NULL) {
-      EZDBG("%s(%d)\n", __func__, __LINE__);
-      err(ezcfg, "can not get process command\n");
-      goto exit_fail;
-    }
-    process->state = PROCESS_STATE_RUNNING;
-    process->force_stop = force_stop;
-    process->ezcfg = ezcfg;
-    EZDBG("%s(%d) pid=[%d] cmd=[%s]\n", __func__, __LINE__, process->process_id, process->command);
-    return process;
-  }
-
   /* handle fork case */
   process->process_id = fork();
   switch(process->process_id) {
@@ -251,6 +264,12 @@ struct ezcfg_process *ezcfg_process_new(struct ezcfg *ezcfg, char *ns)
   case 0:
     /* it's in child process runtime space */
     /* cleanup parent process resources */
+    if (process->command) {
+      free(process->command);
+      process->command = NULL;
+    }
+    free(process);
+    process = NULL;
 
     /* reset signal handlers set from parent process */
     sa.sa_flags = 0;
@@ -294,9 +313,11 @@ struct ezcfg_process *ezcfg_process_new(struct ezcfg *ezcfg, char *ns)
     /* it's in parent process runtime space */
     /* cleanup unused variables */
     if (argv != NULL) {
-      process->command = argv[0];
-      argv[0] = NULL;
-      for (i = 1; i < argc; i++) {
+      if (process->command == NULL) {
+        process->command = argv[0];
+        argv[0] = NULL;
+      }
+      for (i = 0; i < argc; i++) {
         if (argv[i] != NULL) {
           free(argv[i]);
           argv[i] = NULL;
@@ -307,6 +328,7 @@ struct ezcfg_process *ezcfg_process_new(struct ezcfg *ezcfg, char *ns)
     }
 
     /* set child process info */
+    pthread_mutex_init(&(process->process_mutex), NULL);
     process->state = PROCESS_STATE_RUNNING;
     process->force_stop = force_stop;
     process->ezcfg = ezcfg;
@@ -376,9 +398,13 @@ int ezcfg_process_stop(struct ezcfg_process *process, int sig)
 
   ASSERT(process != NULL);
 
+  pthread_mutex_lock(&(process->process_mutex));
+
   if (process->state == PROCESS_STATE_RUNNING) {
     process->state = PROCESS_STATE_STOPPING;
     if (kill(process->process_id, sig) < 0) {
+      EZDBG("%s(%d)\n", __func__, __LINE__);
+      pthread_mutex_unlock(&(process->process_mutex));
       return EZCFG_RET_FAIL;
     }
     /* sleep 500 ms */
@@ -395,8 +421,10 @@ int ezcfg_process_stop(struct ezcfg_process *process, int sig)
   while (process->state != PROCESS_STATE_STOPPED) {
     if (process->force_stop > 0) {
       if (i == process->force_stop) {
+        EZDBG("%s(%d)\n", __func__, __LINE__);
         kill(process->process_id, SIGKILL);
         process->state = PROCESS_STATE_STOPPED;
+        pthread_mutex_unlock(&(process->process_mutex));
         return EZCFG_RET_OK;
       }
       i++;
@@ -415,6 +443,7 @@ int ezcfg_process_stop(struct ezcfg_process *process, int sig)
     }
   }
 
+  pthread_mutex_unlock(&(process->process_mutex));
   return EZCFG_RET_OK;
 }
 
@@ -427,20 +456,27 @@ int ezcfg_process_proc_has_no_process(struct ezcfg_process *process)
 int ezcfg_process_state_set_stopped(struct ezcfg_process *process)
 {
   ASSERT(process != NULL);
+  pthread_mutex_lock(&(process->process_mutex));
   process->state = PROCESS_STATE_STOPPED;
+  pthread_mutex_unlock(&(process->process_mutex));
   return EZCFG_RET_OK;
 }
 
 int ezcfg_process_state_is_stopped(struct ezcfg_process *process)
 {
+  int ret = EZCFG_RET_FAIL;
   ASSERT(process != NULL);
 
+  pthread_mutex_lock(&(process->process_mutex));
   if (process->state == PROCESS_STATE_STOPPED) {
-    return EZCFG_RET_OK;
+    ret = EZCFG_RET_OK;
   }
   else {
-    return EZCFG_RET_FAIL;
+    ret = EZCFG_RET_FAIL;
   }
+  pthread_mutex_unlock(&(process->process_mutex));
+
+  return ret;
 }
 
 int ezcfg_process_del_handler(void *data)

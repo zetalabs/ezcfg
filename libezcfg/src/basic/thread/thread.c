@@ -53,6 +53,7 @@
 struct ezcfg_thread {
   struct ezcfg *ezcfg;
   int state;
+  pthread_mutex_t thread_mutex;
   pthread_t thread_id;
   pthread_attr_t attr;
   void *(*start_routine)(void *);
@@ -61,62 +62,9 @@ struct ezcfg_thread {
   int (*stop)(void *);
 };
 
-/* mutex for thread_state manipulate */
-static pthread_mutex_t thread_state_mutex = PTHREAD_MUTEX_INITIALIZER;
-
 /**
  * private functions
  */
-static int lock_thread_state_mutex(void)
-{
-  int my_errno = 0;
-  int retry = 0;
-  while ((pthread_mutex_lock(&(thread_state_mutex)) < 0) &&
-         (retry < EZCFG_LOCK_RETRY_MAX)) {
-    my_errno = errno;
-    EZDBG("%s(%d) pthread_mutex_lock() with errno=[%d]\n", __func__, __LINE__, my_errno);
-    if (my_errno == EINVAL) {
-      return EZCFG_RET_FAIL;
-    }
-    else {
-      EZDBG("%s(%d) wait a second then try again...\n", __func__, __LINE__);
-      sleep(1);
-      retry++;
-    }
-  }
-  if (retry < EZCFG_LOCK_RETRY_MAX) {
-    return EZCFG_RET_OK;
-  }
-  else {
-    return EZCFG_RET_FAIL;
-  }
-}
-
-static int unlock_thread_state_mutex(void)
-{
-  int my_errno = 0;
-  int retry = 0;
-  while ((pthread_mutex_unlock(&(thread_state_mutex)) < 0) &&
-         (retry < EZCFG_UNLOCK_RETRY_MAX)) {
-    my_errno = errno;
-    EZDBG("%s(%d) pthread_mutex_unlock() with errno=[%d]\n", __func__, __LINE__, my_errno);
-    if (my_errno == EINVAL) {
-      return EZCFG_RET_FAIL;
-    }
-    else {
-      EZDBG("%s(%d) wait a second then try again...\n", __func__, __LINE__);
-      sleep(1);
-      retry++;
-    }
-  }
-  if (retry < EZCFG_UNLOCK_RETRY_MAX) {
-    return EZCFG_RET_OK;
-  }
-  else {
-    return EZCFG_RET_FAIL;
-  }
-}
-
 static int thread_clr(struct ezcfg_thread *thread)
 {
   int ret = EZCFG_RET_FAIL;
@@ -291,6 +239,7 @@ struct ezcfg_thread *ezcfg_thread_new(struct ezcfg *ezcfg, char *ns)
     }
   }
 
+  pthread_mutex_init(&(thread->thread_mutex), NULL);
   thread->state = THREAD_STATE_STOPPED;
   thread->ezcfg = ezcfg;
 
@@ -326,16 +275,10 @@ int ezcfg_thread_clr(struct ezcfg_thread *thread)
 
   ASSERT(thread != NULL);
 
-  if (lock_thread_state_mutex() != EZCFG_RET_OK) {
-    EZDBG("lock_thread_state_mutex() failed\n");
-    return EZCFG_RET_FAIL;
-  }
-
+  pthread_mutex_lock(&(thread->thread_mutex));
   ret = thread_clr(thread);
+  pthread_mutex_unlock(&(thread->thread_mutex));
 
-  if (unlock_thread_state_mutex() != EZCFG_RET_OK) {
-    EZDBG("unlock_thread_state_mutex() failed\n");
-  }
   return ret;
 }
 
@@ -348,19 +291,17 @@ int ezcfg_thread_del(struct ezcfg_thread *thread)
 
   ezcfg = thread->ezcfg;
 
-  if (lock_thread_state_mutex() != EZCFG_RET_OK) {
-    EZDBG("lock_thread_state_mutex() failed\n");
+  pthread_mutex_lock(&(thread->thread_mutex));
+  ret = thread_clr(thread);
+  pthread_mutex_unlock(&(thread->thread_mutex));
+
+  if (ret != EZCFG_RET_OK) {
+    EZDBG("thread_clr() failed\n");
     return EZCFG_RET_FAIL;
   }
 
-  ret = thread_clr(thread);
-  if (ret == EZCFG_RET_OK) {
-    free(thread);
-  }
-
-  if (unlock_thread_state_mutex() != EZCFG_RET_OK) {
-    EZDBG("unlock_thread_state_mutex() failed\n");
-  }
+  pthread_mutex_destroy(&(thread->thread_mutex));
+  free(thread);
 
   /* decrease ezcfg library context reference */
   if (ezcfg_dec_ref(ezcfg) != EZCFG_RET_OK) {
@@ -417,42 +358,35 @@ int ezcfg_thread_set_stop(
 int ezcfg_thread_start(struct ezcfg_thread *thread)
 {
   struct ezcfg *ezcfg = NULL;
-  int s = -1;
+  int ret = EZCFG_RET_FAIL;
 
   ASSERT(thread != NULL);
   ASSERT(thread->start_routine != NULL);
 
   ezcfg = thread->ezcfg;
 
-  if (lock_thread_state_mutex() != EZCFG_RET_OK) {
-    EZDBG("lock_thread_state_mutex() failed\n");
-    return EZCFG_RET_FAIL;
-  }
+  pthread_mutex_lock(&(thread->thread_mutex));
 
   if (thread->state != THREAD_STATE_STOPPED) {
     EZDBG("thread must be stopped firstly\n");
-    if (unlock_thread_state_mutex() != EZCFG_RET_OK) {
-      EZDBG("unlock_thread_state_mutex() failed\n");
-    }
+    pthread_mutex_unlock(&(thread->thread_mutex));
     return EZCFG_RET_FAIL;
   }
 
   /* set state to RUNNING first, thread->start_routine() may check it */
   thread->state = THREAD_STATE_RUNNING;
-  s = pthread_create(&(thread->thread_id), &(thread->attr), thread->start_routine, thread->arg);
-  if (s != 0) {
-    err(ezcfg, "%s: %s", __func__, strerror(s));
+  ret = pthread_create(&(thread->thread_id), &(thread->attr), thread->start_routine, thread->arg);
+  if (ret != 0) {
+    err(ezcfg, "%s: %s", __func__, strerror(ret));
     thread->state = THREAD_STATE_STOPPED;
-    if (unlock_thread_state_mutex() != EZCFG_RET_OK) {
-      EZDBG("unlock_thread_state_mutex() failed\n");
-    }
-    return EZCFG_RET_FAIL;
+    ret = EZCFG_RET_FAIL;
+  }
+  else {
+    ret = EZCFG_RET_OK;
   }
 
-  if (unlock_thread_state_mutex() != EZCFG_RET_OK) {
-    EZDBG("unlock_thread_state_mutex() failed\n");
-  }
-  return EZCFG_RET_OK;
+  pthread_mutex_unlock(&(thread->thread_mutex));
+  return ret;
 }
 
 int ezcfg_thread_stop(struct ezcfg_thread *thread)
@@ -462,10 +396,7 @@ int ezcfg_thread_stop(struct ezcfg_thread *thread)
   ASSERT(thread != NULL);
 
   EZDBG("%s(%d)\n", __func__, __LINE__);
-  if (lock_thread_state_mutex() != EZCFG_RET_OK) {
-    EZDBG("lock_thread_state_mutex() failed\n");
-    return EZCFG_RET_FAIL;
-  }
+  pthread_mutex_lock(&(thread->thread_mutex));
 
   EZDBG("%s(%d)\n", __func__, __LINE__);
   if (thread->state == THREAD_STATE_STOPPED) {
@@ -485,8 +416,10 @@ int ezcfg_thread_stop(struct ezcfg_thread *thread)
   if (thread->stop) {
     EZDBG("%s(%d)\n", __func__, __LINE__);
     thread->state = THREAD_STATE_STOPPING;
+    pthread_mutex_unlock(&(thread->thread_mutex));
     ret = thread->stop(thread->arg);
-    if (ret == EZCFG_RET_OK) {
+    pthread_mutex_lock(&(thread->thread_mutex));
+    if ((ret == EZCFG_RET_OK) && (thread->state == THREAD_STATE_STOPPING)) {
       /* FIXME: thread->stop() makes thread->state = THREAD_STATE_STOPPING */
       /* now it should be STPPED */
       EZDBG("%s(%d) thread->stop() OK, tag it stopped.\n", __func__, __LINE__);
@@ -506,34 +439,62 @@ int ezcfg_thread_stop(struct ezcfg_thread *thread)
 
 func_exit:
   EZDBG("%s(%d)\n", __func__, __LINE__);
-  if (unlock_thread_state_mutex() != EZCFG_RET_OK) {
-    EZDBG("unlock_thread_state_mutex() failed\n");
-  }
+  pthread_mutex_unlock(&(thread->thread_mutex));
   return ret;
+}
+
+int ezcfg_thread_kill(struct ezcfg_thread *thread, int sig)
+{
+  int ret = EZCFG_RET_FAIL;
+
+  ASSERT(thread != NULL);
+
+  ret = pthread_kill(thread->thread_id, sig);
+  if (ret == 0) {
+    return EZCFG_RET_OK;
+  }
+  else {
+    EZDBG("pthread_kill() error = [%d]\n", ret);
+    return EZCFG_RET_FAIL;
+  }
 }
 
 int ezcfg_thread_state_is_running(struct ezcfg_thread *thread)
 {
+  int ret = EZCFG_RET_FAIL;
+
   ASSERT(thread != NULL);
 
+  pthread_mutex_lock(&(thread->thread_mutex));
+
   if (thread->state == THREAD_STATE_RUNNING) {
-    return EZCFG_RET_OK;
+    ret = EZCFG_RET_OK;
   }
   else {
-    return EZCFG_RET_FAIL;
+    ret = EZCFG_RET_FAIL;
   }
+
+  pthread_mutex_unlock(&(thread->thread_mutex));
+  return ret;
 }
 
 int ezcfg_thread_state_is_stopped(struct ezcfg_thread *thread)
 {
+  int ret = EZCFG_RET_FAIL;
+
   ASSERT(thread != NULL);
 
+  pthread_mutex_lock(&(thread->thread_mutex));
+
   if (thread->state == THREAD_STATE_STOPPED) {
-    return EZCFG_RET_OK;
+    ret = EZCFG_RET_OK;
   }
   else {
-    return EZCFG_RET_FAIL;
+    ret = EZCFG_RET_FAIL;
   }
+
+  pthread_mutex_unlock(&(thread->thread_mutex));
+  return ret;
 }
 
 int ezcfg_thread_del_handler(void *data)

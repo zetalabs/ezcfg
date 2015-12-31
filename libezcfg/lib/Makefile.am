@@ -104,9 +104,10 @@ libezcfg_la_SOURCES += ../src/composite/nv_json_http/nv_json_http.c
 # ezcfg socket-based MAS
 libezcfg_la_SOURCES += ../src/composite/socket_agent/socket_agent.c
 #libezcfg_la_SOURCES += ../src/composite/socket_agent/socket_agent_core.c
-#libezcfg_la_SOURCES += ../src/composite/socket_agent/socket_agent_master.c
-#libezcfg_la_SOURCES += ../src/composite/socket_agent/socket_agent_worker.c
-#libezcfg_la_SOURCES += ../src/composite/socket_agent/socket_agent_worker_nv_json_http_socket.c
+libezcfg_la_SOURCES += ../src/composite/socket_agent/socket_agent_master_thread.c
+libezcfg_la_SOURCES += ../src/composite/socket_agent/socket_agent_worker_thread.c
+libezcfg_la_SOURCES += ../src/composite/socket_agent/socket_agent_worker_thread_nv_json_http.c
+libezcfg_la_SOURCES += ../src/composite/socket_agent/socket_agent_env_thread.c
 
 ###################
 # aux utilities 
