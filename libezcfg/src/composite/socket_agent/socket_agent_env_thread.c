@@ -25,9 +25,6 @@
 #include <ctype.h>
 #include <limits.h>
 #include <sys/types.h>
-#include <sys/ipc.h>
-#include <sys/sem.h>
-#include <sys/shm.h>
 #include <sys/stat.h>
 #include <sys/wait.h>
 #include <sys/socket.h>
@@ -156,6 +153,7 @@ int local_socket_agent_env_thread_arg_del(void *arg)
 int local_socket_agent_env_thread_stop(void *arg)
 {
   struct ezcfg_socket_agent *agent = NULL;
+  struct ezcfg_thread *env_thread = NULL;
   struct timespec req;
   struct timespec rem;
 
@@ -163,6 +161,7 @@ int local_socket_agent_env_thread_stop(void *arg)
 
   EZDBG("%s(%d)\n", __func__, __LINE__);
   agent = (struct ezcfg_socket_agent *)arg;
+  env_thread = agent->env_thread;
 
   EZDBG("%s(%d)\n", __func__, __LINE__);
   while (agent->env_thread_stop == 0) {
@@ -177,6 +176,11 @@ int local_socket_agent_env_thread_stop(void *arg)
     EZDBG("%s(%d)\n", __func__, __LINE__);
   }
 
+  EZDBG("%s(%d)\n", __func__, __LINE__);
+  /* Since env_thread arg is the struct of agent, to avoid been freed in ezcfg_thread_del(),
+   * we set env_thread->arg = NULL here !!!
+   */
+  ezcfg_thread_set_arg(env_thread, NULL);
   EZDBG("%s(%d)\n", __func__, __LINE__);
   return EZCFG_RET_OK;
 }

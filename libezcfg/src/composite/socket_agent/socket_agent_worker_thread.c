@@ -128,13 +128,16 @@ static void worker_thread_init_protocol_data(struct worker_thread_arg *arg)
 
   /* set communication protocol */
   arg->proto = ezcfg_socket_get_proto(arg->sp);
+  EZDBG("%s(%d) arg->proto=%d\n", __func__, __LINE__, arg->proto);
 
   /* initialize protocol data structure */
   switch(arg->proto) {
   case EZCFG_PROTO_NV_JSON_HTTP :
+    EZDBG("%s(%d) EZCFG_PROTO_NV_JSON_HTTP\n", __func__, __LINE__);
     arg->proto_data = ezcfg_nv_json_http_new(ezcfg);
     break;
   default :
+    EZDBG("%s(%d) unknown protocol\n", __func__, __LINE__);
     info(ezcfg, "unknown protocol\n");
   }
 }
@@ -149,14 +152,17 @@ static void worker_thread_process_new_connection(struct worker_thread_arg *arg)
   agent = arg->agent;
   ezcfg = agent->ezcfg;
 
+  EZDBG("%s(%d)\n", __func__, __LINE__);
   worker_thread_reset_connection_attributes(arg);
 
   /* dispatch protocol handler */
   switch(arg->proto) {
   case EZCFG_PROTO_NV_JSON_HTTP :
+    EZDBG("%s(%d) EZCFG_PROTO_NV_JSON_HTTP\n", __func__, __LINE__);
     local_socket_agent_worker_thread_process_nv_json_http_new_connection(arg);
     break;
   default :
+    EZDBG("%s(%d) unknown protocol\n", __func__, __LINE__);
     err(ezcfg, "unknown protocol\n");
   }
 }
@@ -224,41 +230,72 @@ void *local_socket_agent_worker_thread_routine(void *arg)
   struct worker_thread_arg *worker_thread_arg = NULL;
   struct ezcfg_socket_agent *agent = NULL;
   struct ezcfg_thread *master_thread = NULL;
+  struct ezcfg_thread *worker_thread = NULL;
+  int ret = EZCFG_RET_FAIL;
 
   ASSERT(arg != NULL);
   worker_thread_arg = (struct worker_thread_arg *)arg;
 
   ASSERT(worker_thread_arg->agent != NULL);
   ASSERT(worker_thread_arg->sp != NULL);
+  ASSERT(worker_thread_arg->worker_thread != NULL);
   agent = worker_thread_arg->agent;
+  worker_thread = worker_thread_arg->worker_thread;
 
   ASSERT(agent->master_thread != NULL);
   master_thread = agent->master_thread;
 
+  EZDBG("%s(%d)\n", __func__, __LINE__);
   while ((ezcfg_thread_state_is_running(master_thread) == EZCFG_RET_OK) &&
          (worker_thread_get_socket_from_queue(worker_thread_arg, EZCFG_AGENT_WORKER_WAIT_TIME) == EZCFG_RET_OK)) {
 
+    EZDBG("%s(%d)\n", __func__, __LINE__);
     /* record start working time */
     worker_thread_arg->birth_time = time(NULL);
 
+    EZDBG("%s(%d)\n", __func__, __LINE__);
     /* initialize protocol data */
     worker_thread_init_protocol_data(worker_thread_arg);
 
+    EZDBG("%s(%d)\n", __func__, __LINE__);
     /* process the connection */
     if (worker_thread_arg->proto_data != NULL) {
+      EZDBG("%s(%d)\n", __func__, __LINE__);
       worker_thread_process_new_connection(worker_thread_arg);
     }
 
+    EZDBG("%s(%d)\n", __func__, __LINE__);
     /* close connection */
     worker_thread_close_connection(worker_thread_arg);
 
+    EZDBG("%s(%d)\n", __func__, __LINE__);
     /* release protocol data */
     if (worker_thread_arg->proto_data != NULL) {
       worker_thread_release_protocol_data(worker_thread_arg);
     }
   }
 
-  return arg;
+  /* clean up data in master thread */
+  pthread_mutex_lock(&(agent->mw_thread_mutex));
+
+  EZDBG("%s(%d)\n", __func__, __LINE__);
+  ezcfg_thread_stop(worker_thread);
+  EZDBG("%s(%d)\n", __func__, __LINE__);
+  ret = ezcfg_linked_list_remove(agent->worker_thread_list, worker_thread);
+  EZDBG("%s(%d)\n", __func__, __LINE__);
+  if (ret != EZCFG_RET_OK) {
+    EZDBG("%s(%d) remove worker_thread error\n", __func__, __LINE__);
+  }
+  agent->num_worker_threads--;
+  EZDBG("%s(%d)\n", __func__, __LINE__);
+  pthread_cond_signal(&(agent->mw_thread_sync_cond));
+  EZDBG("%s(%d)\n", __func__, __LINE__);
+
+  pthread_mutex_unlock(&(agent->mw_thread_mutex));
+
+  EZDBG("%s(%d) exit\n", __func__, __LINE__);
+  //return arg;
+  return NULL;
 }
 
 /*
@@ -268,14 +305,21 @@ int local_socket_agent_worker_thread_arg_del(void *arg)
 {
   struct worker_thread_arg *worker_thread_arg = arg;
 
+  EZDBG("%s(%d)\n", __func__, __LINE__);
   if (worker_thread_arg->sp) {
+    EZDBG("%s(%d)\n", __func__, __LINE__);
     ezcfg_socket_del(worker_thread_arg->sp);
+    EZDBG("%s(%d)\n", __func__, __LINE__);
     worker_thread_arg->sp = NULL;
   }
+  EZDBG("%s(%d)\n", __func__, __LINE__);
   if (worker_thread_arg->proto_data) {
+    EZDBG("%s(%d)\n", __func__, __LINE__);
     worker_thread_release_protocol_data(worker_thread_arg);
+    EZDBG("%s(%d)\n", __func__, __LINE__);
     worker_thread_arg->proto_data = NULL;
   }
+  EZDBG("%s(%d)\n", __func__, __LINE__);
 
   return EZCFG_RET_OK;
 }

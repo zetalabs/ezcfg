@@ -114,6 +114,7 @@ static void handle_nv_json_http_request(struct worker_thread_arg *arg)
 
   if (is_nv_json_http_request(http) == true) {
     if (ezcfg_nv_json_http_handle_request(njh) != EZCFG_RET_OK) {
+      EZDBG("%s(%d) ezcfg_nv_json_http_handle_request() error.\n", __func__, __LINE__);
       /* clean http structure info */
       ezcfg_http_reset_attributes(http);
       ezcfg_http_set_status_code(http, 400);
@@ -122,12 +123,14 @@ static void handle_nv_json_http_request(struct worker_thread_arg *arg)
       /* build JSON/HTTP error response */
       msg_len = ezcfg_nv_json_http_get_message_length(njh);
       if (msg_len < 0) {
+        EZDBG("%s(%d) ezcfg_nv_json_http_get_message_length error.\n", __func__, __LINE__);
         err(ezcfg, "ezcfg_nv_json_http_get_message_length error.\n");
         goto exit;
       }
       msg_len++; /* one more for '\0' */
       msg = (char *)malloc(msg_len);
       if (msg == NULL) {
+        EZDBG("%s(%d) malloc msg error.\n", __func__, __LINE__);
         err(ezcfg, "malloc msg error.\n");
         goto exit;
       }
@@ -137,25 +140,31 @@ static void handle_nv_json_http_request(struct worker_thread_arg *arg)
       goto exit;
     }
     else {
+      EZDBG("%s(%d) build JSON/HTTP binding response.\n", __func__, __LINE__);
       /* build JSON/HTTP binding response */
       msg_len = ezcfg_nv_json_http_get_message_length(njh);
+      EZDBG("%s(%d) msg_len=[%d]\n", __func__, __LINE__, msg_len);
       if (msg_len < 0) {
+        EZDBG("%s(%d) ezcfg_nv_json_http_get_message_length error.\n", __func__, __LINE__);
         err(ezcfg, "ezcfg_nv_json_http_get_message_length error.\n");
         goto exit;
       }
       msg_len++; /* one more for '\0' */
       msg = (char *)malloc(msg_len);
       if (msg == NULL) {
+        EZDBG("%s(%d) malloc msg error.\n", __func__, __LINE__);
         err(ezcfg, "malloc msg error.\n");
         goto exit;
       }
       memset(msg, 0, msg_len);
       msg_len = ezcfg_nv_json_http_write_message(njh, msg, msg_len);
+      EZDBG("%s(%d) msg=[%s]\n", __func__, __LINE__, msg);
       local_socket_agent_worker_thread_write(arg, msg, msg_len);
       goto exit;
     }
   }
   else {
+    EZDBG("%s(%d) unknown nv_json_http request.\n", __func__, __LINE__);
     err(ezcfg, "unknown nv_json_http request.\n");
 
     /* clean http structure info */
@@ -166,12 +175,14 @@ static void handle_nv_json_http_request(struct worker_thread_arg *arg)
     /* build nvram JSON/HTTP binding error response */
     msg_len = ezcfg_nv_json_http_get_message_length(njh);
     if (msg_len < 0) {
+      EZDBG("%s(%d) ezcfg_nv_json_http_get_message_length error.\n", __func__, __LINE__);
       err(ezcfg, "ezcfg_nv_json_http_get_message_length error.\n");
       goto exit;
     }
     msg_len++; /* one more for '\0' */
     msg = (char *)malloc(msg_len);
     if (msg == NULL) {
+      EZDBG("%s(%d) malloc msg error.\n", __func__, __LINE__);
       err(ezcfg, "malloc msg error.\n");
       goto exit;
     }
@@ -209,6 +220,7 @@ void local_socket_agent_worker_thread_process_nv_json_http_new_connection(struct
 
   buf = malloc(buf_len+1); /* +1 for \0 */
   if (buf == NULL) {
+    EZDBG("%s(%d) not enough memory for processing JSON/HTTP new connection\n", __func__, __LINE__);
     err(ezcfg, "not enough memory for processing JSON/HTTP new connection\n");
     return;
   }
@@ -219,6 +231,7 @@ void local_socket_agent_worker_thread_process_nv_json_http_new_connection(struct
   ASSERT(nread >= header_len);
 
   if (header_len <= 0) {
+    EZDBG("%s(%d) request error\n", __func__, __LINE__);
     err(ezcfg, "request error\n");
     free(buf);
     return; /* Request is too large or format is not correct */
@@ -235,6 +248,7 @@ void local_socket_agent_worker_thread_process_nv_json_http_new_connection(struct
     major = ezcfg_nv_json_http_get_http_version_major(njh);
     minor = ezcfg_nv_json_http_get_http_version_minor(njh);
     if ((major != 1) || (minor != 1)) {
+      EZDBG("%s(%d) JSON/HTTP binding version not supported major=%d, minor=%d\n", __func__, __LINE__, major, minor);
       send_nv_json_http_error(arg, 505,
                              "JSON/HTTP binding version not supported",
                              "%s", "Weird HTTP version");
@@ -242,6 +256,7 @@ void local_socket_agent_worker_thread_process_nv_json_http_new_connection(struct
     }
     ret = ezcfg_socket_read_http_content(sp, http, &buf, header_len, &buf_len, &nread);
     if (ret != EZCFG_RET_OK) {
+      EZDBG("%s(%d) Can not parse request: %.*s\n", __func__, __LINE__, nread, buf);
       /* Do not put garbage in the access log */
       send_nv_json_http_error(arg, 400, "Bad Request", "Can not parse request: %.*s", nread, buf);
       goto exit;
@@ -254,6 +269,7 @@ void local_socket_agent_worker_thread_process_nv_json_http_new_connection(struct
     handle_nv_json_http_request(arg);
   }
   else {
+    EZDBG("%s(%d) Can not parse request: %.*s\n", __func__, __LINE__, nread, buf);
     /* Do not put garbage in the access log */
     send_nv_json_http_error(arg, 400, "Bad Request", "Can not parse request: %.*s", nread, buf);
   }

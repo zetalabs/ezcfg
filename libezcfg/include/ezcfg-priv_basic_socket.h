@@ -23,6 +23,7 @@ struct ezcfg_socket *ezcfg_socket_new(struct ezcfg *ezcfg, char *ns);
 struct ezcfg_socket *ezcfg_socket_fake_new(struct ezcfg *ezcfg,
   const int family, const int type, const int proto, const int role,
   const char *laddr, const char *raddr);
+struct ezcfg_socket *ezcfg_socket_new_dummy(struct ezcfg *ezcfg);
 struct ezcfg_socket *ezcfg_socket_calloc(struct ezcfg *ezcfg, int size);
 struct ezcfg_socket *ezcfg_socket_new_accepted_socket(const struct ezcfg_socket *listener);
 void ezcfg_socket_close_sock(struct ezcfg_socket *sp);

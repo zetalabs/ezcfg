@@ -63,6 +63,12 @@ static unsigned char default_coding[4] = {'N','O','N','E'};
  * NVRAM storage medium, version, coding style and a 32 bit CRC over
  * the data part.
  *
+ * to reduce the reallocation operations, we use "name=...=value" format
+ * to fill remain space in an entry. For example, suppose the original
+ * string of an entry is
+ * "name=value123", later we change it to
+ * "name=value9", in the storage memory we save this entry as
+ * "name===value9" so that we don't change the allocation of this entry.
  **************************************************************************
  */
 
@@ -331,6 +337,8 @@ int _local_meta_nvram_get_entries_by_ns(char *buffer, char *ns, struct ezcfg_lin
   char *value = NULL;
   int len = 0;
 
+  EZDBG("%s(%d)\n", __func__, __LINE__);
+
   ASSERT(buffer != NULL);
   ASSERT(list != NULL);
 
@@ -338,14 +346,16 @@ int _local_meta_nvram_get_entries_by_ns(char *buffer, char *ns, struct ezcfg_lin
     ns_len = strlen(ns);
 
   p = buffer + sizeof(struct nvram_header);
-  while ((*p != '\0') || (*(p+1) != '\0')) {
+  while (*p != '\0') {
     /* name */
     q = p;
     while ((*q != '=') && (*q != '\0')) q++;
     if (*q != '=') {
+      EZDBG("%s(%d) p=[%s] q=[%s]\n", __func__, __LINE__, p, q);
       return EZCFG_RET_FAIL;
     }
     len = q - p;
+    EZDBG("%s(%d) len=[%d]\n", __func__, __LINE__, len);
 
     if (ns != NULL) {
       if (len < ns_len)
@@ -355,26 +365,37 @@ int _local_meta_nvram_get_entries_by_ns(char *buffer, char *ns, struct ezcfg_lin
     }
 
     name = malloc(len + 1);
-    if (name == NULL)
+    if (name == NULL) {
+      EZDBG("%s(%d)\n", __func__, __LINE__);
       goto exit_fail;
+    }
     if (len > 0)
       memcpy(name, p, len);
     name[len] = '\0';
+    EZDBG("%s(%d) name=[%s]\n", __func__, __LINE__, name);
 
     /* value */
-    while ((*q == '=') && (*q != '\0')) q++;
-    if (*q != '\0') p = q;
+    while (*q == '=') q++; /* skip all '=' between name and value */
+    p = q; /* p point to value first letter */
     while(*q != '\0') q++;
     len = q - p;
+    EZDBG("%s(%d) len=[%d]\n", __func__, __LINE__, len);
     value = malloc(len + 1);
-    if (value == NULL)
+    if (value == NULL) {
+      EZDBG("%s(%d)\n", __func__, __LINE__);
       goto exit_fail;
+    }
     if (len > 0)
       memcpy(value, p, len);
     value[len] = '\0';
+    EZDBG("%s(%d) value=[%s]\n", __func__, __LINE__, value);
+
+    /* move p to next entry */
+    p = q+1;
 
     data = ezcfg_nv_pair_new(name, value);
     if (data == NULL) {
+      EZDBG("%s(%d)\n", __func__, __LINE__);
       goto exit_fail;
     }
     free(name);
@@ -384,6 +405,7 @@ int _local_meta_nvram_get_entries_by_ns(char *buffer, char *ns, struct ezcfg_lin
     
     ret = ezcfg_linked_list_append(list, data);
     if (ret != EZCFG_RET_OK) {
+      EZDBG("%s(%d)\n", __func__, __LINE__);
       goto exit_fail;
     }
     data = NULL;

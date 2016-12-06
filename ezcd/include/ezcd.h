@@ -138,6 +138,7 @@ int utils_nvram_cmp(const char *name, const char *value);
 /* command entry point */
 int agent_env_main(int argc, char **argv);
 int eznvc_main(int argc, char **argv);
+int eznvdump_main(int argc, char **argv);
 
 #if 0
 int preinit_main(int argc, char **argv);

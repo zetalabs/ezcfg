@@ -63,5 +63,6 @@ int ezcfg_http_get_message_length(struct ezcfg_http *http);
 int ezcfg_http_write_message(struct ezcfg_http *http, char *buf, int len);
 bool ezcfg_http_parse_auth(struct ezcfg_http *http, struct ezcfg_auth *auth);
 bool ezcfg_http_parse_post_data(struct ezcfg_http *http, struct ezcfg_nv_linked_list *list);
+unsigned short ezcfg_http_get_status_code(struct ezcfg_http *http);
 
 #endif /* _EZCFG_PRIV_BASIC_HTTP_H_ */

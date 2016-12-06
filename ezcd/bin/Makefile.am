@@ -39,6 +39,7 @@ ezcd_SOURCES += ../src/agent_env.c
 #ezcd_SOURCES += ../src/nvram.c
 #ezcd_SOURCES += ../src/rc.c
 ezcd_SOURCES += ../src/eznvc.c
+ezcd_SOURCES += ../src/eznvdump.c
 #ezcd_SOURCES += ../src/shelld.c
 #if CONFIG_EZBOX_SERVICE_EZCFG_IGRSD
 #ezcd_SOURCES += ../src/igrs_monitor.c

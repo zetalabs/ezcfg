@@ -32,8 +32,7 @@ ezcfg_log(struct ezcfg *ezcfg,
 	  ...)
   __attribute__((format(printf, 6, 7)));
 
-static inline void __attribute__((always_inline, format(printf, 2, 3)))
-ezcfg_log_null(struct ezcfg *ezcfg, const char *format, ...) {}
+static inline void __attribute__((always_inline, format(printf, 2, 3))) ezcfg_log_null(struct ezcfg *ezcfg, const char *format, ...) {}
 
 #define ezcfg_log_cond(ezcfg, prio, arg...) \
   do { \
@@ -94,6 +93,7 @@ int ezcfg_common_get_nvram_entry_value(struct ezcfg *ezcfg, const char *name, ch
 int ezcfg_common_get_nvram_entries(struct ezcfg *ezcfg, struct ezcfg_linked_list *list);
 int ezcfg_common_set_nvram_entries(struct ezcfg *ezcfg, struct ezcfg_linked_list *list);
 int ezcfg_common_get_nvram_entries_by_ns(struct ezcfg *ezcfg, char *ns, struct ezcfg_linked_list **plist);
+int ezcfg_common_dump_nvram(struct ezcfg *ezcfg);
 
 
 /*

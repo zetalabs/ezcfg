@@ -984,6 +984,24 @@ struct ezcfg_socket *ezcfg_socket_fake_new(struct ezcfg *ezcfg,
   return create_socket(ezcfg, domain, type, proto, role, laddr, raddr, false);
 }
 
+struct ezcfg_socket *ezcfg_socket_new_dummy(struct ezcfg *ezcfg)
+{
+  struct ezcfg_socket *sp = NULL;
+
+  ASSERT(ezcfg != NULL);
+
+  /* initialize socket */
+  if ((sp = calloc(1, sizeof(struct ezcfg_socket))) == NULL) {
+    err(ezcfg, "calloc socket fail: %m\n");
+    return NULL;
+  }
+  memset(sp, 0, sizeof(struct ezcfg_socket));
+  sp->sock = -1;
+  sp->ezcfg = ezcfg;
+
+  return sp;
+}
+
 struct ezcfg *ezcfg_socket_get_ezcfg(const struct ezcfg_socket *sp)
 {
   ASSERT(sp != NULL);

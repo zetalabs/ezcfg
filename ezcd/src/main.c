@@ -56,6 +56,9 @@ int main(int argc, char **argv)
   else if (!strcmp(name, "eznvc")) {
     return eznvc_main(argc, argv);
   }
+  else if (!strcmp(name, "eznvdump")) {
+    return eznvdump_main(argc, argv);
+  }
   else {
     printf("Unknown name [%s]!\n", name);
     return (EXIT_FAILURE);

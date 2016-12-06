@@ -52,6 +52,20 @@
   do { errno = en; perror(msg); exit(EXIT_FAILURE); } while (0)
 
 #if 1
+#ifdef ANDROID_BUILD
+#define DBG(format, args...)                      \
+  do {                                            \
+    FILE *dbg_fp;                                 \
+    if (debug == true)                            \
+      dbg_fp = fopen("/data/kmsg", "a");          \
+    else                                          \
+      dbg_fp = fopen("/dev/kmsg", "a");           \
+    if (dbg_fp) {                                 \
+      fprintf(dbg_fp, format, ## args);           \
+      fclose(dbg_fp);                             \
+    }                                             \
+  } while(0)
+#else
 #define DBG(format, args...)                      \
   do {                                            \
     FILE *dbg_fp;                                 \
@@ -64,10 +78,25 @@
       fclose(dbg_fp);                             \
     }                                             \
   } while(0)
+#endif
 #else
 #define DBG(format, args...)
 #endif
 
+#ifdef ANDROID_BUILD
+#define INFO(format, args...)                     \
+  do {                                            \
+    FILE *info_fp;                                \
+    if (debug == true)                            \
+      info_fp = fopen("/data/kmsg", "a");         \
+    else                                          \
+      info_fp = fopen("/dev/kmsg", "a");          \
+    if (info_fp) {                                \
+      fprintf(info_fp, format, ## args);          \
+      fclose(info_fp);                            \
+    }                                             \
+  } while(0)
+#else
 #define INFO(format, args...)                     \
   do {                                            \
     FILE *info_fp;                                \
@@ -80,7 +109,7 @@
       fclose(info_fp);                            \
     }                                             \
   } while(0)
-
+#endif
 
 #define AGENT_ENV_PRIORITY	-4
 

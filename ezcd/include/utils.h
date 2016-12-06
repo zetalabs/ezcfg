@@ -104,6 +104,9 @@
 /* eznvc command config file path */
 #define EZNVC_CONFIG_FILE_PATH          "/etc/eznvc/eznvc.conf"
 
+/* eznvdump command config file path */
+#define EZNVDUMP_CONFIG_FILE_PATH          "/etc/eznvdump/eznvdump.conf"
+
 /* ezcm command config file path */
 //#define EZCM_CONFIG_FILE_PATH           "/etc/ezcm.conf"
 

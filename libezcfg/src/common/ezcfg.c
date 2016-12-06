@@ -553,7 +553,7 @@ int ezcfg_common_get_nvram_entries(struct ezcfg *ezcfg, struct ezcfg_linked_list
         if (nvram_mutex_locked) {
           _local_nvram_mutex_unlock(nvram);
         }
-        EZDBG("%s(%d)\n", __func__, __LINE__);
+        EZDBG("%s(%d) can't find value for [%s]\n", __func__, __LINE__, data->n);
         return EZCFG_RET_FAIL;
       }
     }
@@ -636,6 +636,10 @@ int ezcfg_common_get_nvram_entries_by_ns(struct ezcfg *ezcfg, char *ns, struct e
   ASSERT (ns != NULL);
   ASSERT (plist != NULL);
 
+  if (strlen(ns) < 1) {
+    return EZCFG_RET_FAIL;
+  }
+
   list = ezcfg_linked_list_new(ezcfg,
     ezcfg_nv_pair_del_handler,
     ezcfg_nv_pair_cmp_handler);
@@ -674,6 +678,116 @@ int ezcfg_common_get_nvram_entries_by_ns(struct ezcfg *ezcfg, char *ns, struct e
   return EZCFG_RET_OK;
 
 exit_fail:
+  if (list)
+    ezcfg_linked_list_del(list);
+
+  if (nvram_mutex_locked) {
+    _local_nvram_mutex_unlock(nvram);
+  }
+  return EZCFG_RET_FAIL;
+}
+
+int ezcfg_common_dump_nvram(struct ezcfg *ezcfg)
+{
+  struct nvram *nvram = NULL;
+  char *val = NULL;
+  char dump_path[EZCFG_PATH_MAX];
+  struct ezcfg_linked_list *list = NULL;
+  int ret = EZCFG_RET_FAIL;
+  int nvram_mutex_locked = 0;
+  struct ezcfg_nv_pair *data = NULL;
+  int i, list_length;
+  FILE *fp = NULL;
+
+  EZDBG("%s(%d)\n", __func__, __LINE__);
+
+  ASSERT (ezcfg != NULL);
+
+  /* get nvram dump path from meta nvram */
+  ret = local_meta_nvram_get_entry_value(ezcfg->meta_nvram, NVRAM_NAME(META, NVRAM_DUMP_PATH), &val);
+  if (ret != EZCFG_RET_OK) {
+    EZDBG("%s(%d)\n", __func__, __LINE__);
+    goto exit_fail;
+  }
+  snprintf(dump_path, EZCFG_PATH_MAX, "%s", val);
+  EZDBG("%s(%d) dump_path=[%s]\n", __func__, __LINE__, dump_path);
+  free(val);
+  val = NULL;
+
+  list = ezcfg_linked_list_new(ezcfg,
+    ezcfg_nv_pair_del_handler,
+    ezcfg_nv_pair_cmp_handler);
+  if (list == NULL) {
+    EZDBG("%s(%d)\n", __func__, __LINE__);
+    return EZCFG_RET_FAIL;
+  }
+
+  nvram = ezcfg->nvram;
+
+  if (nvram != NULL) {
+    ret = _local_nvram_mutex_lock(nvram);
+    if (EZCFG_RET_OK != ret) {
+      EZDBG("%s(%d)\n", __func__, __LINE__);
+      goto exit_fail;
+    }
+    nvram_mutex_locked = 1;
+  }
+
+  /* first get from meta_nvram */
+  ret = _local_meta_nvram_get_entries_by_ns(ezcfg->meta_nvram, NULL, list);
+  if (ret != EZCFG_RET_OK) {
+    EZDBG("%s(%d)\n", __func__, __LINE__);
+    goto exit_fail;
+  }
+  /* then get from nvram and replace the same name in meta_nvram */
+  if (nvram != NULL) {
+    ret = _local_nvram_get_entries_by_ns(nvram, NULL, list);
+    if (ret != EZCFG_RET_OK) {
+      EZDBG("%s(%d)\n", __func__, __LINE__);
+      goto exit_fail;
+    }
+  }
+
+  fp = fopen(dump_path, "w");
+  if (fp == NULL) {
+    EZDBG("%s(%d)\n", __func__, __LINE__);
+    goto exit_fail;
+  }
+
+  list_length = ezcfg_linked_list_get_length(list);
+  EZDBG("%s(%d) list_length=[%d]\n", __func__, __LINE__, list_length);
+
+  for (i = 1; i < list_length+1; i++) {
+    EZDBG("%s(%d) i=[%d]\n", __func__, __LINE__, i);
+    data = (struct ezcfg_nv_pair *)ezcfg_linked_list_get_node_data_by_index(list, i);
+    if (data == NULL) {
+      EZDBG("%s(%d)\n", __func__, __LINE__);
+      goto exit_fail;
+    }
+    if (data->n == NULL) {
+      EZDBG("%s(%d)\n", __func__, __LINE__);
+      goto exit_fail;
+    }
+    if (data->v == NULL) {
+      EZDBG("%s(%d)\n", __func__, __LINE__);
+      goto exit_fail;
+    }
+    EZDBG("%s(%d) data->n=[%s] data-v=[%s]\n", __func__, __LINE__, data->n, data->v);
+    fprintf(fp, "%s=%s\n", data->n, data->v);
+  }
+
+  fclose(fp);
+  ezcfg_linked_list_del(list);
+
+  if (nvram_mutex_locked) {
+    _local_nvram_mutex_unlock(nvram);
+  }
+  return EZCFG_RET_OK;
+
+exit_fail:
+  if (fp)
+    fclose(fp);
+
   if (list)
     ezcfg_linked_list_del(list);
 

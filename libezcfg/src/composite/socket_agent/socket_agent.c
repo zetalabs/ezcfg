@@ -26,9 +26,6 @@
 #include <ctype.h>
 #include <limits.h>
 #include <sys/types.h>
-#include <sys/ipc.h>
-#include <sys/sem.h>
-#include <sys/shm.h>
 #include <sys/stat.h>
 #include <sys/wait.h>
 #include <sys/socket.h>
@@ -62,6 +59,7 @@ static int agent_clr(struct ezcfg_socket_agent *agent)
 {
   int ret = EZCFG_RET_FAIL;
 
+  EZDBG("%s(%d)\n", __func__, __LINE__);
   if (agent->child_process_list) {
     ret = ezcfg_linked_list_del(agent->child_process_list);
     if (ret != EZCFG_RET_OK) {
@@ -71,7 +69,9 @@ static int agent_clr(struct ezcfg_socket_agent *agent)
   }
 
   if (agent->worker_thread_list) {
+    EZDBG("%s(%d)\n", __func__, __LINE__);
     ret = ezcfg_linked_list_del(agent->worker_thread_list);
+    EZDBG("%s(%d)\n", __func__, __LINE__);
     if (ret != EZCFG_RET_OK) {
       EZDBG("%s(%d) delete worker_thread_list error!\n", __func__, __LINE__);
     }
@@ -79,7 +79,9 @@ static int agent_clr(struct ezcfg_socket_agent *agent)
   }
 
   if (agent->sub_agent_thread_list) {
+    EZDBG("%s(%d)\n", __func__, __LINE__);
     ret = ezcfg_linked_list_del(agent->sub_agent_thread_list);
+    EZDBG("%s(%d)\n", __func__, __LINE__);
     if (ret != EZCFG_RET_OK) {
       EZDBG("%s(%d) delete sub_agent_thread_list error!\n", __func__, __LINE__);
     }
@@ -87,7 +89,9 @@ static int agent_clr(struct ezcfg_socket_agent *agent)
   }
 
   if (agent->env_thread) {
+    EZDBG("%s(%d)\n", __func__, __LINE__);
     ret = ezcfg_thread_del(agent->env_thread);
+    EZDBG("%s(%d)\n", __func__, __LINE__);
     if (ret != EZCFG_RET_OK) {
       EZDBG("%s(%d) delete env_thread error!\n", __func__, __LINE__);
     }
@@ -95,7 +99,9 @@ static int agent_clr(struct ezcfg_socket_agent *agent)
   }
 
   if (agent->env_sp) {
+    EZDBG("%s(%d)\n", __func__, __LINE__);
     ret = ezcfg_socket_del(agent->env_sp);
+    EZDBG("%s(%d)\n", __func__, __LINE__);
     if (ret != EZCFG_RET_OK) {
       EZDBG("%s(%d) delete env_sp error!\n", __func__, __LINE__);
     }
@@ -103,7 +109,9 @@ static int agent_clr(struct ezcfg_socket_agent *agent)
   }
 
   if (agent->master_thread) {
+    EZDBG("%s(%d)\n", __func__, __LINE__);
     ret = ezcfg_thread_del(agent->master_thread);
+    EZDBG("%s(%d)\n", __func__, __LINE__);
     if (ret != EZCFG_RET_OK) {
       EZDBG("%s(%d) delete master_thread error!\n", __func__, __LINE__);
     }
@@ -111,7 +119,9 @@ static int agent_clr(struct ezcfg_socket_agent *agent)
   }
 
   if (agent->process) {
+    EZDBG("%s(%d)\n", __func__, __LINE__);
     ezcfg_process_del(agent->process);
+    EZDBG("%s(%d)\n", __func__, __LINE__);
     agent->process = NULL;
   }
 
@@ -546,13 +556,16 @@ int ezcfg_socket_agent_del(struct ezcfg_socket_agent *agent)
     return EZCFG_RET_FAIL;
   }
 
+  EZDBG("%s(%d)\n", __func__, __LINE__);
   free(agent);
+  EZDBG("%s(%d)\n", __func__, __LINE__);
 
   /* decrease ezcfg library context reference */
   if (ezcfg_dec_ref(ezcfg) != EZCFG_RET_OK) {
     EZDBG("ezcfg_dec_ref() failed\n");
   }
 
+  EZDBG("%s(%d)\n", __func__, __LINE__);
   return EZCFG_RET_OK;
 }
 

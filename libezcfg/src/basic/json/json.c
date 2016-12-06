@@ -714,32 +714,38 @@ int ezcfg_json_write_message(struct ezcfg_json *json, char *buf, int len)
 
   /* check if the buffer length is enough */
   if (len <= json->msg_len) {
+    EZDBG("%s(%d) len=[%d], json->msg_len=[%d]\n", __func__, __LINE__, len, json->msg_len);
     return ret;
   }
 
   /* check if json has valid text and stack */
   if ((json->text == NULL) ||
       (json->stack == NULL)) {
+    EZDBG("%s(%d) json->text=[%p], json->stack=[%p]\n", __func__, __LINE__, json->text, json->stack);
     return ret;
   }
 
   /* check if the stack is empty */
   if (ezcfg_stack_list_is_empty(json->stack) == false) {
+    EZDBG("%s(%d)\n", __func__, __LINE__);
     return ret;
   }
 
   /* check if the value type is valid */
   np = ezcfg_binary_tree_get_root(json->text);
   if (np == NULL) {
+    EZDBG("%s(%d)\n", __func__, __LINE__);
     return ret;
   }
   vp = ezcfg_binary_tree_node_get_data(np);
   if (vp == NULL) {
+    EZDBG("%s(%d)\n", __func__, __LINE__);
     return ret;
   }
 
   if ((vp->type != EZCFG_JSON_VALUE_TYPE_OBJECT) &&
       (vp->type != EZCFG_JSON_VALUE_TYPE_ARRAY)) {
+    EZDBG("%s(%d)\n", __func__, __LINE__);
     return ret;
   }
 
@@ -1013,9 +1019,11 @@ int ezcfg_json_write_message(struct ezcfg_json *json, char *buf, int len)
   if ((cur_len == json->msg_len) &&
       (ezcfg_stack_list_is_empty(json->stack) == true)) {
     ret = cur_len;
+    EZDBG("%s(%d) ret=[%d]\n", __func__, __LINE__, ret);
   }
 
  func_out:
+  EZDBG("%s(%d) ret=[%d]\n", __func__, __LINE__, ret);
   return ret;
 }
 

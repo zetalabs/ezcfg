@@ -20,11 +20,14 @@
 #define GLUE2(a, b)      	a ## b
 #define GLUE3(a, b, c)   	a ## b ## c
 #define GLUE4(a, b, c, d)	a ## b ## c ## d
+#define GLUE6(a, b, c, d, e, f)	a ## b ## c ## d ## e ## f
 
 #define NVRAM_PREFIX(prefix)      	GLUE2(EZCFG_NVRAM_PREFIX_, prefix)
 #define NVRAM_ENTITY(prefix, name)	GLUE4(EZCFG_NVRAM_, prefix, _, name)
 #define NVRAM_NAME(prefix, name) \
   NVRAM_PREFIX(prefix) NVRAM_ENTITY(prefix, name)
+#define NVRAM_VALUE(prefix, name, value) \
+  GLUE6(EZCFG_NVRAM_, prefix, _, name, _, value)
 
 #define SERVICE_OPTION(service, name)	GLUE4(EZCFG_NVRAM_, service, _, name)
 

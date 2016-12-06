@@ -30,6 +30,20 @@
 #include <sys/sysinfo.h>
 #include <unistd.h>
 #define ASSERT(exp) assert(exp)   
+#ifdef ANDROID_BUILD
+#define EZDBG(format, args...) \
+  do { \
+    struct sysinfo info;                            \
+    pthread_t tid = pthread_self();                 \
+    FILE *ezdbg_fp = fopen("/data/ezdbg.log", "a"); \
+    sysinfo(&info);                                 \
+    if (ezdbg_fp) {                                 \
+      fprintf(ezdbg_fp, "pid:%d tid:%ld uptime:%ld | ", getpid(), (long int)tid, info.uptime); \
+      fprintf(ezdbg_fp, format, ## args);           \
+      fclose(ezdbg_fp);                             \
+    }                                               \
+  } while(0)
+#else
 #define EZDBG(format, args...) \
   do { \
     struct sysinfo info;                            \
@@ -42,6 +56,7 @@
       fclose(ezdbg_fp);                             \
     }                                               \
   } while(0)
+#endif
 #else
 #define ASSERT(exp) do {} while(0) 
 #define EZDBG(format, args...)

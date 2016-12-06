@@ -54,7 +54,9 @@ static void linked_list_node_del(struct ezcfg_linked_list *list, struct linked_l
 {
   if ((list->data_del_handler != NULL) &&
       (p->data != NULL)) {
+    EZDBG("%s(%d)\n", __func__, __LINE__);
     list->data_del_handler(p->data);
+    EZDBG("%s(%d)\n", __func__, __LINE__);
   }
   free(p);
 }
@@ -251,20 +253,26 @@ int ezcfg_linked_list_remove(struct ezcfg_linked_list *list, void *data)
   ASSERT(list != NULL);
   ASSERT(data != NULL);
 
+  EZDBG("%s(%d)\n", __func__, __LINE__);
+
   if ((list->data_cmp_handler == NULL) ||
       (list->data_del_handler == NULL)) {
     return EZCFG_RET_FAIL;
   }
 
+  EZDBG("%s(%d) list->length=[%d]\n", __func__, __LINE__, list->length);
   np = list->head;
 
   /* remove the head node */
   if (list->data_cmp_handler(np->data, data) == 0) {
     list->head = np->next;
     if (np->next == NULL) {
+      EZDBG("%s(%d)\n", __func__, __LINE__);
       list->tail = NULL;
     }
+    EZDBG("%s(%d)\n", __func__, __LINE__);
     linked_list_node_del(list, np);
+    EZDBG("%s(%d)\n", __func__, __LINE__);
     list->length -= 1;
     return EZCFG_RET_OK;
   }
@@ -277,9 +285,12 @@ int ezcfg_linked_list_remove(struct ezcfg_linked_list *list, void *data)
     if (list->data_cmp_handler(np->data, data) == 0) {
       npp->next = np->next;
       if (np->next == NULL) {
+        EZDBG("%s(%d)\n", __func__, __LINE__);
         list->tail = npp;
       }
+      EZDBG("%s(%d)\n", __func__, __LINE__);
       linked_list_node_del(list, np);
+      EZDBG("%s(%d)\n", __func__, __LINE__);
       list->length -= 1;
       return EZCFG_RET_OK;
     }

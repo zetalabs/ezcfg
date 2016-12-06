@@ -25,9 +25,6 @@
 #include <ctype.h>
 #include <limits.h>
 #include <sys/types.h>
-#include <sys/ipc.h>
-#include <sys/sem.h>
-#include <sys/shm.h>
 #include <sys/stat.h>
 #include <sys/wait.h>
 #include <sys/socket.h>
@@ -57,7 +54,7 @@ static void add_to_set(int fd, fd_set *set, int *max_fd)
 }
 
 /* Master thread adds accepted socket to a queue */
-static int put_socket(struct ezcfg_socket_agent *agent, const struct ezcfg_socket *sp)
+static int put_socket(struct ezcfg_socket_agent *agent, struct ezcfg_socket *sp)
 {
   struct ezcfg *ezcfg = NULL;
   int ret = EZCFG_RET_FAIL;
@@ -98,9 +95,30 @@ static int put_socket(struct ezcfg_socket_agent *agent, const struct ezcfg_socke
       val = NULL;
     }
     if (worker_thread == NULL) {
+      EZDBG("%s(%d) Cannot prepare worker thread\n", __func__, __LINE__);
       err(ezcfg, "Cannot prepare worker thread: %m\n");
       goto func_out;
     }
+
+    worker_thread_arg = malloc(sizeof(struct worker_thread_arg));
+    if (worker_thread_arg == NULL) {
+      EZDBG("%s(%d) Cannot prepare worker thread arg\n", __func__, __LINE__);
+      err(ezcfg, "Cannot prepare worker thread arg: %m\n");
+      goto func_out;
+    }
+    memset(worker_thread_arg, 0, sizeof(struct worker_thread_arg));
+    worker_thread_arg->agent = agent;
+    worker_thread_arg->worker_thread = worker_thread;
+    worker_thread_arg->sp = ezcfg_socket_new_dummy(ezcfg);
+    if (worker_thread_arg->sp == NULL) {
+      EZDBG("%s(%d) Cannot prepare worker thread arg dummy socket\n", __func__, __LINE__);
+      err(ezcfg, "Cannot prepare worker thread arg dummy socket: %m\n");
+      goto func_out;
+    }
+    //worker_thread_arg->proto = proto;
+    //worker_thread_arg->proto_data = proto_data;
+    //worker_thread_arg->birth_time = birth_time;
+    //worker_thread_arg->num_bytes_sent = num_bytes_sent;
 
     /* Set the worker thread start routine */
     ret = ezcfg_thread_set_start_routine(worker_thread, local_socket_agent_worker_thread_routine, worker_thread_arg);
@@ -109,8 +127,6 @@ static int put_socket(struct ezcfg_socket_agent *agent, const struct ezcfg_socke
       err(ezcfg, "can not set worker thread start routine");
       goto func_out;
     }
-    /* worker_thread_arg has been put to worker_thread */
-    worker_thread_arg = NULL;
 
     /*
      * Since agent has been passed to worker_thread_routine(),
@@ -131,35 +147,69 @@ static int put_socket(struct ezcfg_socket_agent *agent, const struct ezcfg_socke
       goto func_out;
     }
 
-    ret = ezcfg_thread_start(worker_thread);
-    if (ret != EZCFG_RET_OK) {
-      err(ezcfg, "Cannot start thread: %m\n");
-      goto func_out;
-    }
     /* add to worker list */
     ret = ezcfg_linked_list_append(agent->worker_thread_list, worker_thread);
     if (ret != EZCFG_RET_OK) {
       EZDBG("%s(%d)\n", __func__, __LINE__);
-      ezcfg_thread_stop(worker_thread);
       goto func_out;
     }
+    agent->num_worker_threads++;
+
+    ret = ezcfg_thread_start(worker_thread);
+    if (ret != EZCFG_RET_OK) {
+      EZDBG("%s(%d) Cannot start thread: %m\n", __func__, __LINE__);
+      err(ezcfg, "Cannot start thread: %m\n");
+      ret = ezcfg_linked_list_remove(agent->worker_thread_list, worker_thread);
+      if (ret != EZCFG_RET_OK) {
+        EZDBG("%s(%d)\n", __func__, __LINE__);
+        goto func_out;
+      }
+      EZDBG("%s(%d)\n", __func__, __LINE__);
+      agent->num_worker_threads--;
+      /* worker_thread_arg and worker_thread have been freed in ezcfg_linked_list_remove() */
+      worker_thread_arg = NULL;
+      worker_thread = NULL;
+      ret = EZCFG_RET_FAIL;
+      goto func_out;
+    }
+    /* worker_thread_arg has been put to worker_thread */
+    worker_thread_arg = NULL;
     /* worker_thread has been appened to agent->worker_thread_list */
     worker_thread = NULL;
-    agent->num_worker_threads++;
   }
   ret = EZCFG_RET_OK;
 
 func_out:
-  if (worker_thread_arg) {
-    local_socket_agent_worker_thread_arg_del(worker_thread_arg);
-    worker_thread_arg = NULL;
-  }
   if (worker_thread) {
+    EZDBG("%s(%d)\n", __func__, __LINE__);
     ezcfg_thread_del(worker_thread);
+    EZDBG("%s(%d)\n", __func__, __LINE__);
+    worker_thread_arg = NULL;
     worker_thread = NULL;
+    EZDBG("%s(%d)\n", __func__, __LINE__);
   }
+
+  if (worker_thread_arg) {
+    EZDBG("%s(%d)\n", __func__, __LINE__);
+    local_socket_agent_worker_thread_arg_del(worker_thread_arg);
+    EZDBG("%s(%d)\n", __func__, __LINE__);
+    free(worker_thread_arg);
+    EZDBG("%s(%d)\n", __func__, __LINE__);
+    worker_thread_arg = NULL;
+    EZDBG("%s(%d)\n", __func__, __LINE__);
+  }
+
+  if (agent->num_worker_threads == 0) {
+    /* no worker thread !!! */
+    agent->mw_sq_head--;
+    ret = EZCFG_RET_FAIL;
+  }
+
+  EZDBG("%s(%d)\n", __func__, __LINE__);
   pthread_cond_signal(&(agent->mw_sq_empty_cond));
+  EZDBG("%s(%d)\n", __func__, __LINE__);
   pthread_mutex_unlock(&(agent->mw_thread_mutex));
+  EZDBG("%s(%d)\n", __func__, __LINE__);
   return ret;
 }
 
@@ -186,15 +236,22 @@ static int accept_new_connection(struct ezcfg_socket_agent *agent,
 
   if (allowed == true) {
     ret = put_socket(agent, accepted);
+    EZDBG("%s(%d) ret=[%d]\n", __func__, __LINE__, ret);
     if (ret != EZCFG_RET_OK) {
       EZDBG("%s(%d) put_socket() accepted socket error.\n", __func__, __LINE__);
       err(ezcfg, "put_socket() accepted socket error.\n");
+      ezcfg_socket_del(accepted);
     }
-    /*FIXME: don't ezcfg_socket_del(), it has been copy to queue */
-    free(accepted);
+    else {
+      /* we don't use ezcfg_socket_del() because accepted->sock has been put into queue in put_socket() */
+      free(accepted);
+    }
+    EZDBG("%s(%d)\n", __func__, __LINE__);
   }
   else {
+    EZDBG("%s(%d)\n", __func__, __LINE__);
     ezcfg_socket_del(accepted);
+    EZDBG("%s(%d)\n", __func__, __LINE__);
     ret = EZCFG_RET_OK;
   }
 
@@ -232,6 +289,7 @@ static void master_thread_finish(struct ezcfg_socket_agent *agent)
   while (agent->num_worker_threads > 0) {
     EZDBG("%s(%d)\n", __func__, __LINE__);
     pthread_cond_wait(&(agent->mw_thread_sync_cond), &(agent->mw_thread_mutex));
+    EZDBG("%s(%d)\n", __func__, __LINE__);
   }
   agent->worker_threads_max = 0;
 
@@ -340,6 +398,7 @@ void *local_socket_agent_master_thread_routine(void *arg)
           if (accept_new_connection(agent, sp) != EZCFG_RET_OK) {
             /* re-enable the socket */
             err(ezcfg, "accept_new_connection() failed\n");
+            EZDBG("%s(%d) accept_new_connection() failed\n", __func__, __LINE__);
 
             if (ezcfg_socket_enable_again(sp) < 0) {
               err(ezcfg, "ezcfg_socket_enable_again() failed\n");
@@ -356,9 +415,12 @@ void *local_socket_agent_master_thread_routine(void *arg)
   }
 
   /* Stop signal received: somebody called ezcfg_socket_agent_stop. Quit. */
+  EZDBG("%s(%d)\n", __func__, __LINE__);
   master_thread_finish(agent);
+  EZDBG("%s(%d)\n", __func__, __LINE__);
 
-  return arg;
+  //return arg;
+  return NULL;
 }
 
 /*
@@ -366,6 +428,7 @@ void *local_socket_agent_master_thread_routine(void *arg)
  */
 int local_socket_agent_master_thread_arg_del(void *arg)
 {
+  EZDBG("%s(%d)\n", __func__, __LINE__);
   return EZCFG_RET_OK;
 }
 
@@ -375,6 +438,7 @@ int local_socket_agent_master_thread_arg_del(void *arg)
 int local_socket_agent_master_thread_stop(void *arg)
 {
   struct ezcfg_socket_agent *agent = NULL;
+  struct ezcfg_thread *master_thread = NULL;
   struct timespec req;
   struct timespec rem;
 
@@ -382,6 +446,7 @@ int local_socket_agent_master_thread_stop(void *arg)
 
   EZDBG("%s(%d)\n", __func__, __LINE__);
   agent = (struct ezcfg_socket_agent *)arg;
+  master_thread = agent->master_thread;
 
   EZDBG("%s(%d)\n", __func__, __LINE__);
   while (agent->master_thread_stop == 0) {
@@ -396,6 +461,11 @@ int local_socket_agent_master_thread_stop(void *arg)
     EZDBG("%s(%d)\n", __func__, __LINE__);
   }
 
+  EZDBG("%s(%d)\n", __func__, __LINE__);
+  /* Since master_thread arg is the struct of agent, to avoid been freed in ezcfg_thread_del(),
+   * we set master_thread->arg = NULL here !!!
+   */
+  ezcfg_thread_set_arg(master_thread, NULL);
   EZDBG("%s(%d)\n", __func__, __LINE__);
   return EZCFG_RET_OK;
 }

@@ -1544,3 +1544,13 @@ bool ezcfg_http_parse_post_data(struct ezcfg_http *http, struct ezcfg_nv_linked_
 
   return true;
 }
+
+unsigned short ezcfg_http_get_status_code(struct ezcfg_http *http)
+{
+  ASSERT(http != NULL);
+
+  if (http->state != HTTP_RESPONSE)
+    return 0;
+
+  return http->status_code_maps[http->status_code_index].status_code;
+}

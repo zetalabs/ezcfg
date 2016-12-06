@@ -77,6 +77,38 @@ static int build_nv_json_http_response(struct ezcfg_nv_json_http *njh)
   return EZCFG_RET_OK;
 }
 
+static int is_meta_action_dump_nvram(struct ezcfg_linked_list *list)
+{
+  int list_length;
+  struct ezcfg_nv_pair *data = NULL;
+  list_length = ezcfg_linked_list_get_length(list);
+  if (list_length != 1) {
+    EZDBG("%s(%d)\n", __func__, __LINE__);
+    return EZCFG_RET_FAIL;
+  }
+
+  data = (struct ezcfg_nv_pair *)ezcfg_linked_list_get_node_data_by_index(list, 1);
+  if (data == NULL) {
+    EZDBG("%s(%d)\n", __func__, __LINE__);
+    return EZCFG_RET_FAIL;
+  }
+  if (data->n == NULL) {
+    EZDBG("%s(%d)\n", __func__, __LINE__);
+    return EZCFG_RET_FAIL;
+  }
+  if (data->v == NULL) {
+    EZDBG("%s(%d)\n", __func__, __LINE__);
+    return EZCFG_RET_FAIL;
+  }
+
+  if ((strcmp(data->n, NVRAM_NAME(META, ACTION)) == 0) &&
+      (strcmp(data->v, NVRAM_VALUE(META, ACTION, DUMP_NVRAM)) == 0)) {
+    return EZCFG_RET_OK;
+  } else {
+    return EZCFG_RET_FAIL;
+  }
+}
+
 /**
  * Public functions
  **/
@@ -418,6 +450,7 @@ int ezcfg_nv_json_http_write_message(struct ezcfg_nv_json_http *njh, char *buf, 
 
 int ezcfg_nv_json_http_handle_request(struct ezcfg_nv_json_http *njh)
 {
+  struct ezcfg *ezcfg;
   struct ezcfg_json *json;
   int ret = EZCFG_RET_FAIL;
 
@@ -426,12 +459,20 @@ int ezcfg_nv_json_http_handle_request(struct ezcfg_nv_json_http *njh)
   ASSERT(njh->json != NULL);
   ASSERT(njh->nv_list == NULL);
 
+  ezcfg = njh->ezcfg;
   json = njh->json;
 
   /* json contains parsed text info */
   njh->nv_list = ezcfg_json_build_nvram_node_list(json);
   if (njh->nv_list != NULL) {
-    ret = build_nv_json_http_response(njh);
+    if (is_meta_action_dump_nvram(njh->nv_list) == EZCFG_RET_OK) {
+      ret = ezcfg_common_dump_nvram(ezcfg);
+      if (ret == EZCFG_RET_OK) {
+        ret = build_nv_json_http_response(njh);
+      }
+    } else {
+      ret = build_nv_json_http_response(njh);
+    }
   }
 
   return ret;

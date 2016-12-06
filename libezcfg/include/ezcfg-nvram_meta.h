@@ -29,6 +29,11 @@
   "shm_ezcfg_rc_queue_length"
 #define EZCFG_NVRAM_META_SOCK_NVRAM_PATH         "sock_nvram_path"
 #define EZCFG_NVRAM_META_NVRAM_NODE_LIST_SIZE    "nvram_node_list_size"
+#define EZCFG_NVRAM_META_NVRAM_DUMP_PATH         "nvram_dump_path"
+#define EZCFG_NVRAM_META_ACTION                  "action"
 #define EZCFG_NVRAM_META_LOG_FILE_PATH           "log_file_path"
+
+/* meta action values */
+#define EZCFG_NVRAM_META_ACTION_DUMP_NVRAM       "dump_nvram"
 
 #endif

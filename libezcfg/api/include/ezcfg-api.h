@@ -101,6 +101,7 @@ int ezcfg_api_nvram_remove_ssl(struct ezcfg_arg_nvram_ssl *ap);
 #endif
 
 int ezcfg_api_nvram_change(char *init_conf, char *ns, char *nv_json, char **presult);
+int ezcfg_api_nvram_dump(char *init_conf, char *ns, char **presult);
 
 #if 0
 /* ezctp interface */
