@@ -153,7 +153,8 @@ static int put_socket(struct ezcfg_socket_agent *agent, struct ezcfg_socket *sp)
       EZDBG("%s(%d)\n", __func__, __LINE__);
       goto func_out;
     }
-    agent->num_worker_threads++;
+    /* we increase agent->num_worker_threads in local_socket_agent_worker_thread_routine() */
+    //agent->num_worker_threads++;
 
     ret = ezcfg_thread_start(worker_thread);
     if (ret != EZCFG_RET_OK) {
@@ -165,7 +166,8 @@ static int put_socket(struct ezcfg_socket_agent *agent, struct ezcfg_socket *sp)
         goto func_out;
       }
       EZDBG("%s(%d)\n", __func__, __LINE__);
-      agent->num_worker_threads--;
+      /* we decrease agent->num_worker_threads in local_socket_agent_worker_thread_routine() */
+      //agent->num_worker_threads--;
       /* worker_thread_arg and worker_thread have been freed in ezcfg_linked_list_remove() */
       worker_thread_arg = NULL;
       worker_thread = NULL;
@@ -177,6 +179,7 @@ static int put_socket(struct ezcfg_socket_agent *agent, struct ezcfg_socket *sp)
     /* worker_thread has been appened to agent->worker_thread_list */
     worker_thread = NULL;
   }
+  EZDBG("%s(%d)\n", __func__, __LINE__);
   ret = EZCFG_RET_OK;
 
 func_out:
@@ -199,11 +202,13 @@ func_out:
     EZDBG("%s(%d)\n", __func__, __LINE__);
   }
 
+#if 0
   if (agent->num_worker_threads == 0) {
     /* no worker thread !!! */
     agent->mw_sq_head--;
     ret = EZCFG_RET_FAIL;
   }
+#endif
 
   EZDBG("%s(%d)\n", __func__, __LINE__);
   pthread_cond_signal(&(agent->mw_sq_empty_cond));

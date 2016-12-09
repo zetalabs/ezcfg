@@ -102,6 +102,60 @@ int ezcfg_socket_read_http_header(struct ezcfg_socket *sp, struct ezcfg_http *ht
   return len;
 }
 
+int ezcfg_socket_read_http_content_to_file(char *file, struct ezcfg_socket *sp, struct ezcfg_http *http, char *boundary)
+{
+  char buf[4096];
+  char tmpbuf[4096];
+  int n, len = 0;
+  char *p;
+  int content_length;
+  int bufsize = sizeof(buf);
+
+  ASSERT(sp != NULL);
+  ASSERT(http != NULL);
+
+  if ((p = ezcfg_http_get_header_value(http, EZCFG_HTTP_HEADER_CONTENT_LENGTH)) != NULL) {
+    content_length = atoi(p);
+  } else {
+    printf("unknow content length\n");
+    return 0;
+  }
+  int nread = content_length;
+
+  FILE *fp = fopen(file, "a+");
+  if (!fp) {
+    printf("fopen() error\n");
+    return 0;
+  }
+
+  while (len < nread) {
+    memset(buf, 0, sizeof(buf));
+    n = ezcfg_socket_read(sp, buf, sizeof(buf), 0);
+    if (n < bufsize) {
+      if (n > 0) {
+        strcpy(tmpbuf, buf);
+	int i;
+	for (i=0;i<n;i++)
+	  tmpbuf[i] = isprint(buf[i])?buf[i]:'*';
+        p  = strstr(tmpbuf, boundary);
+        if (p) {
+          fwrite(buf, 1, p - tmpbuf - 4, fp);//-4: \r\n\r\n
+          len += (p - tmpbuf - 4);
+        } else {
+          printf("%s:%d) should not be here[%s]\n", __func__, __LINE__, boundary);
+        }
+      }
+      break;
+    } else {
+      fwrite(buf, 1, n, fp);
+      len += n;
+    }
+  }
+
+  fclose(fp);
+  return len;
+}
+
 /**
  * Keep reading the input into buffer buf, until reach max buffer size or error.
  * Buffer buf may already have some data. The length of the data is stored in nread.

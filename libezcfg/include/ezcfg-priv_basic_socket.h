@@ -77,5 +77,6 @@ int ezcfg_socket_role_is_client(struct ezcfg_socket *sp);
 /* socket/socket_http.c */
 int ezcfg_socket_read_http_header(struct ezcfg_socket *sp, struct ezcfg_http *http, char *buf, int bufsiz, int *nread);
 int ezcfg_socket_read_http_content(struct ezcfg_socket *sp, struct ezcfg_http *http, char **pbuf, int header_len, int *bufsiz, int *nread);
+int ezcfg_socket_read_http_content_to_file(char *file, struct ezcfg_socket *sp, struct ezcfg_http *http, char *boundary);
 
 #endif /* _EZCFG_PRIV_BASIC_SOCKET_H_ */

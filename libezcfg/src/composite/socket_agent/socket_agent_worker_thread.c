@@ -54,12 +54,13 @@ static int worker_thread_get_socket_from_queue(struct worker_thread_arg *arg, in
 
   pthread_mutex_lock(&(agent->mw_thread_mutex));
   /* If the queue is empty, wait. We're idle at this point. */
-  agent->num_idle_worker_threads++;
+  //agent->num_idle_worker_threads++;
   while (agent->mw_sq_head == agent->mw_sq_tail) {
     ts.tv_nsec = 0;
     ts.tv_sec = time(NULL) + wait_time;
     if (pthread_cond_timedwait(&(agent->mw_sq_empty_cond), &(agent->mw_thread_mutex), &ts) != 0) {
       /* Timeout! release the mutex and return */
+      //agent->num_idle_worker_threads--;
       pthread_mutex_unlock(&(agent->mw_thread_mutex));
       return EZCFG_RET_FAIL;
     }
@@ -67,7 +68,7 @@ static int worker_thread_get_socket_from_queue(struct worker_thread_arg *arg, in
   ASSERT(agent->mw_sq_head > agent->mw_sq_tail);
 
   /* We're going busy now: got a socket to process! */
-  agent->num_idle_worker_threads--;
+  //agent->num_idle_worker_threads--;
 
   /* Copy socket from the queue and increment tail */
   ezcfg_socket_queue_get_socket(agent->mw_socket_queue, agent->mw_sq_tail % agent->mw_sq_len, arg->sp);
@@ -136,6 +137,10 @@ static void worker_thread_init_protocol_data(struct worker_thread_arg *arg)
     EZDBG("%s(%d) EZCFG_PROTO_NV_JSON_HTTP\n", __func__, __LINE__);
     arg->proto_data = ezcfg_nv_json_http_new(ezcfg);
     break;
+  case EZCFG_PROTO_HTTP:
+    EZDBG("%s(%d) EZCFG_PROTO_HTTP\n", __func__, __LINE__);
+    arg->proto_data = ezcfg_http_new(ezcfg);
+    break;
   default :
     EZDBG("%s(%d) unknown protocol\n", __func__, __LINE__);
     info(ezcfg, "unknown protocol\n");
@@ -161,6 +166,10 @@ static void worker_thread_process_new_connection(struct worker_thread_arg *arg)
     EZDBG("%s(%d) EZCFG_PROTO_NV_JSON_HTTP\n", __func__, __LINE__);
     local_socket_agent_worker_thread_process_nv_json_http_new_connection(arg);
     break;
+  case EZCFG_PROTO_HTTP:
+    EZDBG("%s(%d) EZCFG_PROTO_HTTP\n", __func__, __LINE__);
+    local_socket_agent_worker_thread_process_http_new_connection(arg);
+    break;
   default :
     EZDBG("%s(%d) unknown protocol\n", __func__, __LINE__);
     err(ezcfg, "unknown protocol\n");
@@ -182,6 +191,10 @@ static void worker_thread_release_protocol_data(struct worker_thread_arg *arg)
   switch(arg->proto) {
   case EZCFG_PROTO_NV_JSON_HTTP :
     ezcfg_nv_json_http_del(arg->proto_data);
+    arg->proto_data = NULL;
+    break;
+  case EZCFG_PROTO_HTTP:
+    ezcfg_http_del(arg->proto_data);
     arg->proto_data = NULL;
     break;
   default :
@@ -245,9 +258,25 @@ void *local_socket_agent_worker_thread_routine(void *arg)
   ASSERT(agent->master_thread != NULL);
   master_thread = agent->master_thread;
 
+  pthread_mutex_lock(&(agent->mw_thread_mutex));
+  agent->num_worker_threads++;
+  agent->num_idle_worker_threads++;
+  pthread_mutex_unlock(&(agent->mw_thread_mutex));
+
   EZDBG("%s(%d)\n", __func__, __LINE__);
-  while ((ezcfg_thread_state_is_running(master_thread) == EZCFG_RET_OK) &&
-         (worker_thread_get_socket_from_queue(worker_thread_arg, EZCFG_AGENT_WORKER_WAIT_TIME) == EZCFG_RET_OK)) {
+  while (ezcfg_thread_state_is_running(master_thread) == EZCFG_RET_OK) {
+
+    pthread_mutex_lock(&(agent->mw_thread_mutex));
+    agent->num_idle_worker_threads--;
+    pthread_mutex_unlock(&(agent->mw_thread_mutex));
+
+    if (worker_thread_get_socket_from_queue(worker_thread_arg, EZCFG_AGENT_WORKER_WAIT_TIME) != EZCFG_RET_OK) {
+      pthread_mutex_lock(&(agent->mw_thread_mutex));
+      agent->num_idle_worker_threads++;
+      pthread_mutex_unlock(&(agent->mw_thread_mutex));
+      break;
+    }
+
 
     EZDBG("%s(%d)\n", __func__, __LINE__);
     /* record start working time */
@@ -273,6 +302,10 @@ void *local_socket_agent_worker_thread_routine(void *arg)
     if (worker_thread_arg->proto_data != NULL) {
       worker_thread_release_protocol_data(worker_thread_arg);
     }
+
+    pthread_mutex_lock(&(agent->mw_thread_mutex));
+    agent->num_idle_worker_threads++;
+    pthread_mutex_unlock(&(agent->mw_thread_mutex));
   }
 
   /* clean up data in master thread */
@@ -287,6 +320,7 @@ void *local_socket_agent_worker_thread_routine(void *arg)
     EZDBG("%s(%d) remove worker_thread error\n", __func__, __LINE__);
   }
   agent->num_worker_threads--;
+  agent->num_idle_worker_threads--;
   EZDBG("%s(%d)\n", __func__, __LINE__);
   pthread_cond_signal(&(agent->mw_thread_sync_cond));
   EZDBG("%s(%d)\n", __func__, __LINE__);

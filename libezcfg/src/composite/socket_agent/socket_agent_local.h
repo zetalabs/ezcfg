@@ -105,6 +105,8 @@ int local_socket_agent_worker_thread_stop(void *arg);
 /* socket_agent_worker_thread_nv_json_http.c */
 void local_socket_agent_worker_thread_process_nv_json_http_new_connection(struct worker_thread_arg *arg);
 
+void local_socket_agent_worker_thread_process_http_new_connection(struct worker_thread_arg *arg);
+
 /* socket_agent_env_thread.c */
 void *local_socket_agent_env_thread_routine(void *arg);
 int local_socket_agent_env_thread_arg_del(void *arg);

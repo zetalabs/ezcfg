@@ -1351,6 +1351,8 @@ int ezcfg_socket_binding(struct ezcfg_socket *sp)
   case AF_INET:
     err = bind(sp->sock,
 	       (struct sockaddr *)&usa->u.sin, usa->len);
+    if (err < 0)
+      printf("%s:%d) %s\n", __func__, __LINE__, strerror(errno));
     break;
 
 #if (HAVE_EZBOX_EZCFG_IPV6 == 1)
@@ -1408,6 +1410,7 @@ int ezcfg_socket_enable_receiving(struct ezcfg_socket *sp)
     err = bind(sp->sock,
 	       (struct sockaddr *)&usa->u.sin, usa->len);
     if (err < 0) {
+      printf("%s:%d) %s\n", __func__, __LINE__, strerror(errno));
       break;
     }
 

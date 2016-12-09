@@ -106,6 +106,7 @@ libezcfg_la_SOURCES += ../src/composite/socket_agent/socket_agent.c
 #libezcfg_la_SOURCES += ../src/composite/socket_agent/socket_agent_core.c
 libezcfg_la_SOURCES += ../src/composite/socket_agent/socket_agent_master_thread.c
 libezcfg_la_SOURCES += ../src/composite/socket_agent/socket_agent_worker_thread.c
+libezcfg_la_SOURCES += ../src/composite/socket_agent/socket_agent_worker_thread_http.c
 libezcfg_la_SOURCES += ../src/composite/socket_agent/socket_agent_worker_thread_nv_json_http.c
 libezcfg_la_SOURCES += ../src/composite/socket_agent/socket_agent_env_thread.c
 
